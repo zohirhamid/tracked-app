@@ -200,6 +200,14 @@ export const trackerAPI = {
     return response.data;
   },
 
+  // Get focused "today" view (optionally: ?date=YYYY-MM-DD)
+  getTodayView: async (dateStr) => {
+    const response = await api.get('/tracker/today/', {
+      params: dateStr ? { date: dateStr } : undefined,
+    });
+    return response.data;
+  },
+
   // List all trackers
   listTrackers: async () => {
     const response = await api.get('/tracker/trackers/');

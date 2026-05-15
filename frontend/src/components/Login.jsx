@@ -177,15 +177,6 @@ const Login = () => {
             gap: '8px',
         }}>
           Life Tracker
-          <span style={{
-            background: theme.accentBg,
-            color: theme.accent,
-            padding: '2px 6px',
-            fontSize: '8px',
-            letterSpacing: '1px',
-          }}>
-            AI
-          </span>
         </div>
           <h1 style={{
             fontSize: '28px',

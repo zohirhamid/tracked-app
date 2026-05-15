@@ -30,15 +30,6 @@ const LandingPage = () => {
           gap: '8px',
         }}>
           Life Tracker
-          <span style={{
-            background: theme.accentBg,
-            color: theme.accent,
-            padding: '2px 6px',
-            fontSize: '8px',
-            letterSpacing: '1px',
-          }}>
-            AI
-          </span>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
@@ -105,7 +96,7 @@ const LandingPage = () => {
           textTransform: 'uppercase',
           marginBottom: '24px',
         }}>
-          Track · Analyze · Improve
+          Track · Review · Improve
         </div>
 
         <h1 className="fade-up fade-up-2" style={{
@@ -116,7 +107,7 @@ const LandingPage = () => {
           letterSpacing: '-1px',
         }}>
           Your habits,<br />
-          <span style={{ color: theme.accent }}>understood by AI</span>
+          <span style={{ color: theme.accent }}>made easy to see</span>
         </h1>
 
         <p className="fade-up fade-up-3" style={{
@@ -128,8 +119,7 @@ const LandingPage = () => {
           fontWeight: '300',
         }}>
           Log your daily habits in a minimal spreadsheet-like interface.
-          Hit analyze and let AI find the patterns, correlations, and
-          insights you'd never spot yourself.
+          Spot trends across days and weeks, and build consistency with a simple workflow.
         </p>
 
         <div className="fade-up fade-up-4" style={{
@@ -189,14 +179,14 @@ const LandingPage = () => {
             />
             <StepCard
               number="02"
-              title="Analyze"
-              description="Hit one button. AI examines up to 30 days of your data, understanding each tracker's context — units, scales, and types."
+              title="Review"
+              description="See your month at a glance. Weekly and monthly summary rows help you notice what’s working."
               theme={theme}
             />
             <StepCard
               number="03"
               title="Improve"
-              description="Get trends, correlations between habits, and actionable advice. Discover that planning your day leads to 40% more deep work."
+              description="Adjust one habit at a time. Use the grid to stay honest and keep momentum."
               theme={theme}
             />
           </div>
@@ -231,8 +221,8 @@ const LandingPage = () => {
               theme={theme}
             />
             <FeatureCard
-              label="AI-Powered Insights"
-              detail="GPT analyzes your patterns and finds correlations between habits"
+              label="Summary Rows"
+              detail="Weekly and monthly stats per tracker for quick progress checks"
               theme={theme}
             />
             <FeatureCard
@@ -262,7 +252,7 @@ const LandingPage = () => {
           gap: '48px',
           flexWrap: 'wrap',
         }}>
-          {['Django', 'React', 'PostgreSQL', 'OpenAI API'].map(tech => (
+          {['Django', 'React', 'PostgreSQL'].map(tech => (
             <span key={tech} style={{
               fontSize: '10px',
               letterSpacing: '2px',

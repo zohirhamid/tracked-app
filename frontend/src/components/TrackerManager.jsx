@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { trackerAPI } from '../services/api';
 
-const TrackerManager = ({ isOpen, onClose, trackers, onUpdate, theme }) => {
-  const [localTrackers, setLocalTrackers] = useState([...trackers].sort((a, b) => a.display_order - b.display_order));
+const TrackerManager = ({ isOpen, onClose, trackers, onUpdate }) => {
+  const initial = useMemo(() => {
+    const list = Array.isArray(trackers) ? [...trackers] : [];
+    return list.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  }, [trackers]);
+
+  const [localTrackers, setLocalTrackers] = useState(initial);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLocalTrackers(initial);
+  }, [isOpen, initial]);
 
   const handleDragStart = (index) => {
     setDraggedIndex(index);
@@ -14,15 +24,13 @@ const TrackerManager = ({ isOpen, onClose, trackers, onUpdate, theme }) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
 
-    const newTrackers = [...localTrackers];
-    const draggedItem = newTrackers[draggedIndex];
-    
-    // Remove from old position
-    newTrackers.splice(draggedIndex, 1);
-    // Insert at new position
-    newTrackers.splice(index, 0, draggedItem);
-    
-    setLocalTrackers(newTrackers);
+    setLocalTrackers((prev) => {
+      const next = [...prev];
+      const draggedItem = next[draggedIndex];
+      next.splice(draggedIndex, 1);
+      next.splice(index, 0, draggedItem);
+      return next;
+    });
     setDraggedIndex(index);
   };
 
@@ -33,19 +41,17 @@ const TrackerManager = ({ isOpen, onClose, trackers, onUpdate, theme }) => {
   const saveOrder = async () => {
     setSaving(true);
     try {
-      // Update display_order for each tracker
-      for (let i = 0; i < localTrackers.length; i++) {
+      for (let i = 0; i < localTrackers.length; i += 1) {
         const tracker = localTrackers[i];
-        if (tracker.display_order !== i + 1) {
-          await trackerAPI.updateTracker(tracker.id, {
-            ...tracker,
-            display_order: i + 1,
-          });
+        const nextOrder = i + 1;
+        if (tracker.display_order !== nextOrder) {
+          await trackerAPI.updateTracker(tracker.id, { ...tracker, display_order: nextOrder });
         }
       }
-      await onUpdate();
-      onClose();
+      await onUpdate?.();
+      onClose?.();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Failed to save tracker order:', error);
       alert('Failed to save order');
     } finally {
@@ -53,259 +59,45 @@ const TrackerManager = ({ isOpen, onClose, trackers, onUpdate, theme }) => {
     }
   };
 
-  const handleDelete = async (trackerId) => {
-    if (!confirm('Are you sure you want to delete this tracker?')) return;
-    
-    try {
-      await trackerAPI.deleteTracker(trackerId);
-      setLocalTrackers(localTrackers.filter(t => t.id !== trackerId));
-      await onUpdate();
-    } catch (error) {
-      console.error('Failed to delete tracker:', error);
-    }
-  };
-
-  const toggleActive = async (tracker) => {
-    try {
-      await trackerAPI.updateTracker(tracker.id, {
-        ...tracker,
-        is_active: !tracker.is_active,
-      });
-      setLocalTrackers(localTrackers.map(t => 
-        t.id === tracker.id ? { ...t, is_active: !t.is_active } : t
-      ));
-      await onUpdate();
-    } catch (error) {
-      console.error('Failed to toggle tracker:', error);
-    }
-  };
-
   if (!isOpen) return null;
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
+      className="modal-overlay open"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
       }}
-      onClick={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: theme.bg,
-          border: `1px solid ${theme.border}`,
-          width: '100%',
-          maxWidth: '600px',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          fontFamily: 'inherit',
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: '24px',
-            borderBottom: `1px solid ${theme.border}`,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: '400',
-                margin: 0,
-                color: theme.text,
-              }}
-            >
-              Manage Trackers
-            </h2>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Rearrange columns</h3>
+
+        <div className="tm-subtitle">Drag to reorder. Click save when done.</div>
+
+        <div className="tm-list" role="list" aria-label="Columns">
+          {localTrackers.map((tracker, index) => (
             <div
-              style={{
-                fontSize: '10px',
-                color: theme.textMuted,
-                marginTop: '4px',
-              }}
+              key={tracker.id}
+              className={`tm-item ${draggedIndex === index ? 'dragging' : ''}`}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              role="listitem"
+              title="Drag to reorder"
             >
-              Drag to reorder, click to toggle active/inactive
+              <span className="tm-handle" aria-hidden="true">⋮⋮</span>
+              <div className="tm-meta">
+                <div className="tm-name">{tracker.name}</div>
+                <div className="tm-type">{tracker.tracker_type}{tracker.unit ? ` · ${tracker.unit}` : ''}</div>
+              </div>
             </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: theme.textMuted,
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0',
-              width: '32px',
-              height: '32px',
-            }}
-          >
-            ×
-          </button>
+          ))}
         </div>
 
-        {/* Tracker List */}
-        <div style={{ padding: '16px' }}>
-          {localTrackers.length === 0 ? (
-            <div
-              style={{
-                padding: '40px',
-                textAlign: 'center',
-                color: theme.textMuted,
-                fontSize: '12px',
-              }}
-            >
-              No trackers yet
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {localTrackers.map((tracker, index) => (
-                <div
-                  key={tracker.id}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  style={{
-                    background: tracker.is_active ? theme.bgCard : theme.borderLight,
-                    border: `1px solid ${draggedIndex === index ? theme.accent : theme.borderLight}`,
-                    padding: '16px',
-                    cursor: 'grab',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    opacity: tracker.is_active ? 1 : 0.5,
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                    <span
-                      style={{
-                        color: theme.textDim,
-                        fontSize: '16px',
-                        cursor: 'grab',
-                      }}
-                    >
-                      ⋮⋮
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          color: theme.text,
-                          marginBottom: '4px',
-                          fontWeight: '700',
-                        }}
-                      >
-                        {tracker.name}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '10px',
-                          color: theme.textMuted,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                        }}
-                      >
-                        {tracker.tracker_type}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => toggleActive(tracker)}
-                      style={{
-                        background: 'transparent',
-                        border: `1px solid ${theme.borderLight}`,
-                        color: tracker.is_active ? theme.accent : theme.textMuted,
-                        padding: '6px 12px',
-                        cursor: 'pointer',
-                        fontSize: '9px',
-                        letterSpacing: '1px',
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      {tracker.is_active ? 'ACTIVE' : 'HIDDEN'}
-                    </button>
-                    <button
-                      onClick={() => handleDelete(tracker.id)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: theme.textDim,
-                        cursor: 'pointer',
-                        fontSize: '18px',
-                        padding: '4px 8px',
-                      }}
-                      title="Delete tracker"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: `1px solid ${theme.border}`,
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: `1px solid ${theme.borderLight}`,
-              color: theme.textMuted,
-              padding: '10px 20px',
-              cursor: 'pointer',
-              fontSize: '10px',
-              letterSpacing: '1px',
-              fontFamily: 'inherit',
-            }}
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={saveOrder}
-            disabled={saving}
-            style={{
-              background: theme.accent,
-              border: 'none',
-              color: theme.accentText,
-              padding: '10px 20px',
-              cursor: saving ? 'default' : 'pointer',
-              fontSize: '10px',
-              letterSpacing: '1px',
-              fontFamily: 'inherit',
-              fontWeight: '500',
-              opacity: saving ? 0.6 : 1,
-            }}
-          >
-            {saving ? 'SAVING...' : 'SAVE ORDER'}
+        <div className="modal-actions">
+          <button className="btn-cancel" type="button" onClick={() => onClose?.()}>Cancel</button>
+          <button className="btn-add" type="button" onClick={saveOrder} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -314,3 +106,4 @@ const TrackerManager = ({ isOpen, onClose, trackers, onUpdate, theme }) => {
 };
 
 export default TrackerManager;
+

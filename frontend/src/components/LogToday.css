@@ -1,0 +1,47 @@
+.logTodayContainer {
+  padding: 16px 32px 32px;
+}
+
+.logTodayHeader {
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.logTodayHeaderActions {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.logTodayPanel {
+  margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .logTodayContainer {
+    padding: 12px 14px 20px;
+  }
+
+  .logTodayHeader {
+    flex-wrap: wrap;
+    align-items: flex-start !important;
+  }
+
+  .logTodayHeaderActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .logTodayPanelHeader {
+    display: none !important;
+  }
+
+  .logTodayRow {
+    grid-template-columns: 1fr !important;
+  }
+
+  .logTodayRowValue {
+    border-left: none !important;
+    border-top: 1px solid var(--lt-border-light) !important;
+  }
+}

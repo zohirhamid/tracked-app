@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import LifeTracker from './components/LifeTracker';
+import LogToday from './components/LogToday';
 import { ThemeProvider } from './theme/ThemeContext';
 import { Link, RouteSwitch, navigate, useRoutePath } from './app/router.jsx';
 
@@ -40,12 +41,14 @@ function AppContent() {
     { path: '/', element: LandingPage },
     { path: '/login', element: Login },
     { path: '/app', element: LifeTracker },
+    { path: '/app/today', element: LogToday },
   ]), []);
 
   useEffect(() => {
     if (isLoading) return;
-    if (isAuthenticated && path !== '/app') navigate('/app', { replace: true });
-    if (!isAuthenticated && path === '/app') navigate('/login', { replace: true });
+    const isAppRoute = path === '/app' || path.startsWith('/app/');
+    if (isAuthenticated && !isAppRoute) navigate('/app', { replace: true });
+    if (!isAuthenticated && isAppRoute) navigate('/login', { replace: true });
   }, [isAuthenticated, isLoading, path]);
 
   if (isLoading) {
