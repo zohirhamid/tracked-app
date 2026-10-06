@@ -2,7 +2,6 @@
 from django.urls import path
 from .views import (
     MonthView,
-    TodayView,
     TrackerListView,
     TrackerCreateView,
     TrackerUpdateView,
@@ -17,9 +16,6 @@ urlpatterns = [
     # Month view
     path('month/<int:year>/<int:month>/', MonthView.as_view(), name='month_view'),
 
-    # Today view
-    path('today/', TodayView.as_view(), name='today_view'),
-    
     # Tracker CRUD
     path('trackers/', TrackerListView.as_view(), name='tracker_list'),  # GET (list)
     path('trackers/create/', TrackerCreateView.as_view(), name='tracker_create'),  # POST (create)

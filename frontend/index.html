@@ -2,18 +2,121 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F9F7F3" />
+    <meta name="api-base-url" content="" />
     <title>Life Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div class="topbar">
+      <div class="brand-group">
+        <span class="index-tag" id="index-year">(INDEX) 2026</span>
+        <a class="brand-title" href="/" aria-label="Lifelog home">LIFELOG</a>
+      </div>
+      <div class="topbar-actions">
+        <button class="secondary-button" id="manage-trackers" type="button">TRACKERS</button>
+        <button class="log-entry-button" id="log-entry" type="button">+ LOG ENTRY</button>
+        <button class="secondary-button" id="sign-out" type="button" hidden>SIGN OUT</button>
+      </div>
+    </div>
+    <main id="app">
+      <div class="dashboard-content">
+        <section class="month-section" aria-labelledby="month-section-label">
+          <div class="month-toolbar">
+            <h1 id="month-section-label"><time id="month-heading" datetime="2026-10">October 2026</time></h1>
+            <div class="month-controls" aria-label="Choose month">
+              <button class="month-arrow" id="previous-month" type="button" aria-label="Previous month">‹</button>
+              <button class="today-button" id="current-month" type="button">Current</button>
+              <button class="month-arrow" id="next-month" type="button" aria-label="Next month">›</button>
+            </div>
+          </div>
+          <p class="app-status" id="app-status" role="status" aria-live="polite"></p>
+          <div class="tracker-table-wrap">
+            <table class="tracker-table">
+              <colgroup id="tracker-columns"></colgroup>
+              <thead>
+                <tr id="tracker-head"></tr>
+              </thead>
+              <tbody id="tracker-body"></tbody>
+            </table>
+          </div>
+          <section class="summary-section" aria-labelledby="summary-heading">
+            <div class="summary-title-row">
+              <h2 id="summary-heading">Monthly averages</h2>
+              <span id="tracked-days" class="index-tag"></span>
+            </div>
+            <div class="summary-grid" id="summary-grid"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <div class="auth-view" id="auth-view" hidden>
+      <form class="auth-panel" id="auth-form">
+        <p class="index-tag">PRIVATE LIFELOG</p>
+        <h2 id="auth-title">Sign in</h2>
+        <p class="form-copy" id="auth-copy">Sign in to load your trackers.</p>
+        <div class="google-auth" id="google-auth" hidden></div>
+        <div class="auth-divider" id="auth-divider" hidden><span></span><small>OR</small><span></span></div>
+        <label>Email<input id="auth-email" type="email" autocomplete="email" required /></label>
+        <label>Password<input id="auth-password" type="password" autocomplete="current-password" required /></label>
+        <p class="form-error" id="auth-error" role="alert"></p>
+        <button class="log-entry-button form-submit" type="submit">SIGN IN</button>
+        <button class="text-button" id="auth-toggle" type="button">Create an account</button>
+      </form>
+    </div>
+
+    <dialog class="app-dialog" id="entry-dialog">
+      <form class="dialog-form" id="entry-form">
+        <div class="dialog-heading">
+          <div><p class="index-tag">ENTRY</p><h2 id="entry-title">Log entry</h2></div>
+          <button class="dialog-close" type="button" data-close="entry-dialog" aria-label="Close">×</button>
+        </div>
+        <label>Date<input id="entry-date" type="date" required /></label>
+        <label>Tracker<select id="entry-tracker" required></select></label>
+        <div id="entry-input"></div>
+        <p class="form-error" id="entry-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="secondary-button" id="clear-entry" type="button">CLEAR</button>
+          <button class="log-entry-button" type="submit">SAVE ENTRY</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="app-dialog tracker-dialog" id="tracker-dialog">
+      <div class="dialog-form">
+        <div class="dialog-heading">
+          <div><p class="index-tag">SETTINGS</p><h2>Trackers</h2></div>
+          <button class="dialog-close" type="button" data-close="tracker-dialog" aria-label="Close">×</button>
+        </div>
+        <div class="tracker-list" id="tracker-list"></div>
+        <form class="new-tracker-form" id="new-tracker-form">
+          <h3>Add tracker</h3>
+          <label>Name<input id="new-tracker-name" maxlength="100" required /></label>
+          <label>Type
+            <select id="new-tracker-type">
+              <option value="binary">Yes / No</option><option value="number">Number</option>
+              <option value="time">Time</option><option value="duration">Duration</option>
+              <option value="text">Text / Notes</option><option value="rating">Rating</option>
+              <option value="prayer">Prayer</option>
+            </select>
+          </label>
+          <label>Unit<input id="new-tracker-unit" maxlength="20" /></label>
+          <label>Rating min<input id="new-tracker-min" type="number" /></label>
+          <label>Rating max<input id="new-tracker-max" type="number" /></label>
+          <button class="log-entry-button" type="submit">ADD TRACKER</button>
+        </form>
+        <p class="form-error" id="tracker-error" role="alert"></p>
+      </div>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

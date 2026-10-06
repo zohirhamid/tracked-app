@@ -19,6 +19,9 @@ class MonthView(generics.GenericAPIView):
     serializer_class = TrackerSerializer
     
     def get(self, request, year, month):
+        if year < 1 or month < 1 or month > 12:
+            raise ValidationError({"month": "Use a valid year and a month from 1 to 12."})
+
         trackers = Tracker.objects.filter(
             user=request.user,
             is_active=True
@@ -34,6 +37,7 @@ class MonthView(generics.GenericAPIView):
         data = {
             'trackers': tracker_serializer.data,
             'weeks': weeks,
+            'summaries': month_builder.build_summaries(trackers),
             'month_name': calendar.month_name[month],
             'months': [{'name': calendar.month_abbr[m], 'number': m} for m in range(1, 13)],
             
@@ -44,54 +48,6 @@ class MonthView(generics.GenericAPIView):
 
         return Response(data, status=status.HTTP_200_OK)
 
-
-class TodayView(generics.GenericAPIView):
-    """A focused view for logging a single day (defaults to today)."""
-    permission_classes = [IsAuthenticated]
-    serializer_class = TrackerSerializer
-
-    def get(self, request):
-        trackers = Tracker.objects.filter(
-            user=request.user,
-            is_active=True
-        ).order_by('display_order')
-
-        requested_date = request.query_params.get('date')
-        if requested_date:
-            day_date = self.parse_date(requested_date)
-        else:
-            day_date = date.today()
-
-        snapshot, _ = DailySnapshot.objects.get_or_create(user=request.user, date=day_date)
-        entries = Entry.objects.filter(
-            daily_snapshot=snapshot,
-            tracker__in=trackers
-        ).select_related('tracker')
-
-        entries_dict = {}
-        for entry in entries:
-            entries_dict[entry.tracker.id] = EntrySerializer(entry).data
-
-        tracker_serializer = self.get_serializer(trackers, many=True)
-
-        data = {
-            'trackers': tracker_serializer.data,
-            'day': {
-                'date': day_date.isoformat(),
-                'day': day_date.day,
-                'entries': entries_dict,
-            },
-            # Server "today" is still useful for UI hints, even if date=... is passed.
-            'today': date.today().isoformat(),
-        }
-
-        return Response(data, status=status.HTTP_200_OK)
-
-    def parse_date(self, date_str):
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            raise ValidationError({"date": "Invalid date format. Use YYYY-MM-DD."})
 
 class TrackerListView(generics.ListAPIView):
     """Returns all user's trackers in a list format"""

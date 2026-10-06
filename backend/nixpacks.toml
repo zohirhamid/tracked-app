@@ -1,6 +1,0 @@
-# nixpacks.toml
-[phases.setup]
-nixPkgs = ['python312']
-
-[phases.build]
-cmds = ['pip install --no-cache-dir -r requirements.txt']
