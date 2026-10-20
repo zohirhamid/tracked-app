@@ -1,25 +1,18 @@
 from django.contrib import admin
-from .models import Profile, Tracker, DailySnapshot, Entry
-
-
-@admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'google_id')
-    search_fields = ('user__email',)
+from .models import Tracker, DailySnapshot, Entry
 
 
 @admin.register(Tracker)
 class TrackerAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'tracker_type', 'is_active')
+    list_display = ('name', 'tracker_type', 'is_active')
     list_filter = ('tracker_type', 'is_active')
-    search_fields = ('name', 'user__email')
+    search_fields = ('name',)
 
 
 @admin.register(DailySnapshot)
 class DailySnapshotAdmin(admin.ModelAdmin):
-    list_display = ('user', 'date')
+    list_display = ('date',)
     list_filter = ('date',)
-    search_fields = ('user__email',)
     date_hierarchy = 'date'
 
 

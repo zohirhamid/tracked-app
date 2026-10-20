@@ -1,34 +1,51 @@
 from datetime import datetime, date
 import calendar
-from .models import Tracker, DailySnapshot, Entry
+from .models import AccountSetup, Tracker, DailySnapshot, Entry
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from .serializers import TrackerSerializer, EntrySerializer
+from .serializers import TrackerSerializer, EntrySerializer, UsernameSerializer
 from .services import MonthDataBuilder
 from .utils import get_month_navigation
-from .permissions import CanCreateTracker, IsOwner, IsEntryOwner
 from rest_framework import generics, status
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
 
+class UsernameView(generics.GenericAPIView):
+    serializer_class = UsernameSerializer
+
+    def get(self, request):
+        setup, _ = AccountSetup.objects.get_or_create(user=request.user)
+        return Response({
+            **self.get_serializer(request.user).data,
+            "is_complete": setup.username_is_set,
+        })
+
+    def post(self, request):
+        serializer = self.get_serializer(request.user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        setup, _ = AccountSetup.objects.get_or_create(user=request.user)
+        setup.username_is_set = True
+        setup.save(update_fields=["username_is_set"])
+        return Response(
+            {**serializer.data, "is_complete": True},
+            status=status.HTTP_200_OK,
+        )
+
+
 class MonthView(generics.GenericAPIView):
     """The main Excel-like grid view API for a specific month"""
-    permission_classes = [IsAuthenticated]
     serializer_class = TrackerSerializer
     
     def get(self, request, year, month):
         if year < 1 or month < 1 or month > 12:
             raise ValidationError({"month": "Use a valid year and a month from 1 to 12."})
 
-        trackers = Tracker.objects.filter(
-            user=request.user,
-            is_active=True
-        ).order_by('display_order')
+        trackers = Tracker.objects.filter(is_active=True).order_by('display_order')
         
         # Use the MonthDataBuilder service
-        month_builder = MonthDataBuilder(request.user, year, month)
+        month_builder = MonthDataBuilder(year, month)
         weeks = month_builder.build_weeks(trackers)
         
         # Serialize trackers
@@ -50,40 +67,46 @@ class MonthView(generics.GenericAPIView):
 
 
 class TrackerListView(generics.ListAPIView):
-    """Returns all user's trackers in a list format"""
-    permission_classes = [IsAuthenticated, IsOwner]
+    """Returns all trackers in a list format"""
     serializer_class = TrackerSerializer
 
     def get_queryset(self) -> QuerySet[Tracker]: # type: ignore[override]
-        return Tracker.objects.filter(user=self.request.user).order_by('-is_active', 'display_order', 'name')
+        return Tracker.objects.order_by('-is_active', 'display_order', 'name')
         
 class TrackerCreateView(generics.CreateAPIView):
     serializer_class = TrackerSerializer
-    permission_classes = [IsAuthenticated, CanCreateTracker]
-
-    # sets the owner at creation time
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
 class TrackerUpdateView(generics.UpdateAPIView):
-    queryset = Tracker.objects.all()
     serializer_class = TrackerSerializer
-    permission_classes = [IsAuthenticated, IsOwner]
+
+    def get_queryset(self):
+        return Tracker.objects.all()
 
 class EntryCreateView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
+    @staticmethod
+    def response_data(tracker, date_obj, entry=None):
+        summaries = MonthDataBuilder(date_obj.year, date_obj.month).build_summaries([tracker])
+        return {
+            "success": True,
+            "entry_id": entry.id if entry else None,
+            "entry": EntrySerializer(entry).data if entry else None,
+            "summary": summaries[0],
+        }
 
     def post(self, request):
         data = request.data
 
-        tracker = get_object_or_404(Tracker, id=data.get('tracker_id'), user=request.user)
+        tracker = get_object_or_404(Tracker, id=data.get('tracker_id'))
         date_obj = self.parse_date(data.get('date'))
-        snapshot, _ = DailySnapshot.objects.get_or_create(user=request.user, date=date_obj)
+        snapshot, _ = DailySnapshot.objects.get_or_create(date=date_obj)
 
         # Handle delete request (no need to fetch first)
         if data.get("delete_entry"):
             Entry.objects.filter(tracker=tracker, daily_snapshot=snapshot).delete()
-            return Response({"success": True}, status=status.HTTP_200_OK)
+            return Response(
+                self.response_data(tracker, date_obj),
+                status=status.HTTP_200_OK,
+            )
 
         # Get or create the entry
         entry, created = Entry.objects.get_or_create(
@@ -108,8 +131,8 @@ class EntryCreateView(generics.GenericAPIView):
             )
 
         return Response(
-            {"success": True, "entry_id": entry.id},
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            self.response_data(tracker, date_obj, entry),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     def parse_date(self, date_str):
@@ -119,11 +142,13 @@ class EntryCreateView(generics.GenericAPIView):
             raise ValidationError({"date": "Invalid date format. Use YYYY-MM-DD."})
 
 class TrackerDeleteView(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated, IsOwner]
-    queryset = Tracker.objects.all()
     serializer_class = TrackerSerializer
 
+    def get_queryset(self):
+        return Tracker.objects.all()
+
 class EntryDeleteView(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated, IsEntryOwner]
-    queryset = Entry.objects.all()
     serializer_class = EntrySerializer
+
+    def get_queryset(self):
+        return Entry.objects.all()

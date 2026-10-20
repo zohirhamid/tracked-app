@@ -2,6 +2,61 @@ export function flattenDays(weeks) {
   return (weeks || []).flatMap((week) => week || []);
 }
 
+export function updateMonthEntry(monthData, date, trackerId, entry, summary) {
+  const day = flattenDays(monthData?.weeks).find((candidate) => candidate.date === date);
+  if (!day) return false;
+
+  day.entries ||= {};
+  if (entry) day.entries[trackerId] = entry;
+  else delete day.entries[trackerId];
+
+  if (summary) {
+    monthData.summaries ||= [];
+    const index = monthData.summaries.findIndex((item) => item.tracker_id === trackerId);
+    if (index === -1) monthData.summaries.push(summary);
+    else monthData.summaries[index] = summary;
+  }
+  return true;
+}
+
+export function findSocialProvider(config, providerId) {
+  const providers = config?.data?.socialaccount?.providers;
+  if (!Array.isArray(providers)) return null;
+  return providers.find((provider) => provider?.id === providerId) || null;
+}
+
+export function apiBaseUrl(configuredValue, location) {
+  const configured = configuredValue?.trim().replace(/\/$/, "");
+  if (configured) return configured;
+
+  const localHosts = new Set([
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "[::]",
+    "[::1]",
+    "::",
+    "::1",
+  ]);
+  if (!localHosts.has(location.hostname)) return "/api/v1";
+
+  // The frontend may listen on IPv6 while Django's development server uses
+  // its default localhost address.
+  const apiHost = ["[::]", "[::1]", "::", "::1", "0.0.0.0"].includes(location.hostname)
+    ? "localhost"
+    : location.hostname;
+  return `${location.protocol}//${apiHost}:8000/api/v1`;
+}
+
+export function canonicalDevelopmentUrl(location) {
+  const aliases = new Set(["0.0.0.0", "[::]", "[::1]", "::", "::1"]);
+  if (!aliases.has(location.hostname)) return null;
+
+  const url = new URL(location.href);
+  url.hostname = "localhost";
+  return url.href;
+}
+
 export function dateParts(dateString) {
   const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);

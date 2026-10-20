@@ -15,16 +15,14 @@
 - [x] Define one configurable API base URL for local and deployed environments.
 - [x] Add a shared `request()` helper with JSON parsing and consistent error handling.
 - [x] Send cookies with `credentials: "include"`.
-- [x] Use Allauth app-session authentication; cookie-mode CSRF bootstrap is not required.
-- [x] Support the Allauth `X-Session-Token` header for protected writes.
+- [x] Send Allauth app-session tokens in the `X-Session-Token` header.
 
 ## 3. Connect authentication
 
 - [x] Add signed-out, loading, and signed-in application states.
-- [x] Build email/password sign-in using the Allauth headless endpoints.
+- [x] Build email/password signup and sign-in using Allauth headless endpoints.
 - [x] Add sign-out.
-- [x] Handle expired sessions and `401` responses without leaving stale tracker data visible.
-- [x] Add Google sign-in when a Google client ID is configured.
+- [x] Require authentication for the tracker API (tracker data remains shared by the current schema).
 
 ## 4. Render the monthly sheet from Django
 

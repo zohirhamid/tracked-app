@@ -1,15 +1,20 @@
-import { dateParts, entryTone, flattenDays, formatEntry } from "./lib.mjs";
+import {
+  apiBaseUrl,
+  canonicalDevelopmentUrl,
+  dateParts,
+  entryTone,
+  findSocialProvider,
+  flattenDays,
+  formatEntry,
+  updateMonthEntry,
+} from "./lib.mjs";
+
+const canonicalUrl = canonicalDevelopmentUrl(window.location);
+if (canonicalUrl) window.location.replace(canonicalUrl);
 
 const apiMeta = document.querySelector('meta[name="api-base-url"]');
-const configuredApiBase = apiMeta?.content.trim().replace(/\/$/, "");
-const isLocalFrontend = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const API_BASE_URL = configuredApiBase || (
-  isLocalFrontend
-    ? `${window.location.protocol}//${window.location.hostname}:8000/api/v1`
-    : "/api/v1"
-);
+const API_BASE_URL = apiBaseUrl(apiMeta?.content, window.location);
 const SESSION_TOKEN_KEY = "lifelog_session_token";
-
 const elements = {
   app: document.querySelector("#app"),
   status: document.querySelector("#app-status"),
@@ -30,11 +35,14 @@ const elements = {
   authCopy: document.querySelector("#auth-copy"),
   authEmail: document.querySelector("#auth-email"),
   authPassword: document.querySelector("#auth-password"),
+  authConfirmPasswordField: document.querySelector("#auth-confirm-password-field"),
+  authConfirmPassword: document.querySelector("#auth-confirm-password"),
   authError: document.querySelector("#auth-error"),
   authToggle: document.querySelector("#auth-toggle"),
   googleAuth: document.querySelector("#google-auth"),
   authDivider: document.querySelector("#auth-divider"),
   signOut: document.querySelector("#sign-out"),
+  marketingNav: document.querySelector("#marketing-nav"),
   logEntry: document.querySelector("#log-entry"),
   manageTrackers: document.querySelector("#manage-trackers"),
   entryDialog: document.querySelector("#entry-dialog"),
@@ -48,6 +56,8 @@ const elements = {
   trackerList: document.querySelector("#tracker-list"),
   trackerError: document.querySelector("#tracker-error"),
   newTrackerForm: document.querySelector("#new-tracker-form"),
+  deleteTrackerDialog: document.querySelector("#delete-tracker-dialog"),
+  deleteTrackerName: document.querySelector("#delete-tracker-name"),
 };
 
 const today = new Date();
@@ -110,28 +120,45 @@ async function request(path, options = {}, retryOnExpiredToken = true) {
     : await response.text();
   const responseToken = payload?.meta?.session_token;
   if (responseToken) setSessionToken(responseToken);
-
   if (response.status === 410 && retryOnExpiredToken) {
     setSessionToken(null);
     return request(path, options, false);
   }
   if (!response.ok) {
+    if ([401, 403].includes(response.status) && !path.startsWith("/_allauth/")) {
+      setSessionToken(null);
+      setAuthState("unauthenticated");
+    }
     throw new ApiError(errorMessage(payload, response.statusText), response.status, payload);
   }
   return payload;
 }
 
+function setAuthState(state) {
+  const authenticated = state === "authenticated";
+  elements.authView.hidden = authenticated;
+  elements.app.hidden = !authenticated;
+  elements.logEntry.hidden = !authenticated;
+  elements.manageTrackers.hidden = !authenticated;
+  elements.signOut.hidden = !authenticated;
+  elements.marketingNav.hidden = authenticated;
+  elements.authForm.setAttribute("aria-busy", String(state === "loading"));
+  if (state === "loading") {
+    elements.authCopy.textContent = "Checking your session…";
+    elements.authForm.querySelectorAll("input, button").forEach((control) => {
+      control.disabled = true;
+    });
+  } else {
+    elements.authForm.querySelectorAll("input, button").forEach((control) => {
+      control.disabled = false;
+    });
+    updateAuthMode();
+  }
+}
+
 function setStatus(message = "", type = "") {
   elements.status.textContent = message;
   elements.status.className = `app-status${type ? ` ${type}` : ""}`;
-}
-
-function setAuthenticated(isAuthenticated) {
-  elements.authView.hidden = isAuthenticated;
-  elements.app.hidden = !isAuthenticated;
-  elements.logEntry.hidden = !isAuthenticated;
-  elements.manageTrackers.hidden = !isAuthenticated;
-  elements.signOut.hidden = !isAuthenticated;
 }
 
 function columnWidth(tracker) {
@@ -236,6 +263,21 @@ function createInlineEditor(tracker, entry) {
   return input;
 }
 
+function updateInlineCell(cell, date, tracker, entry) {
+  const value = formatEntry(entry, tracker);
+  cell.classList.remove("editing", "saving", "good", "warn", "bad");
+  const tone = entryTone(entry, tracker);
+  if (tone) cell.classList.add(tone);
+  cell.textContent = value;
+  cell.setAttribute("aria-label", `${tracker.name}, ${date}${value ? `: ${value}` : ", empty"}`);
+}
+
+function applyInlineSave(date, tracker, cell, result) {
+  updateMonthEntry(monthData, date, tracker.id, result.entry, result.summary);
+  updateInlineCell(cell, date, tracker, result.entry);
+  renderSummaries();
+}
+
 function startInlineEdit(cell, date, tracker, entry) {
   if (activeInlineEditor?.cell === cell) return;
   if (activeInlineEditor) return;
@@ -257,12 +299,12 @@ function startInlineEdit(cell, date, tracker, entry) {
     finished = true;
     cell.classList.add("saving");
     try {
-      await request("/tracker/entries/create/", {
+      const result = await request("/tracker/entries/create/", {
         method: "POST",
         body: JSON.stringify(inlineValuePayload(tracker, date, editor)),
       });
       activeInlineEditor = null;
-      await loadMonth();
+      applyInlineSave(date, tracker, cell, result);
     } catch (error) {
       finished = false;
       cell.classList.remove("saving");
@@ -362,7 +404,14 @@ function renderTable() {
       const tone = entryTone(entry, tracker);
       if (tone) cell.classList.add(tone);
       if (tracker.tracker_type === "text") cell.classList.add("note");
-      const open = () => startInlineEdit(cell, day.date, tracker, entry);
+      const open = () => {
+        const currentDay = flattenDays(monthData?.weeks)
+          .find((candidate) => candidate.date === day.date);
+        const currentEntry = currentDay?.entries?.[tracker.id]
+          || currentDay?.entries?.[String(tracker.id)]
+          || null;
+        startInlineEdit(cell, day.date, tracker, currentEntry);
+      };
       cell.addEventListener("click", (event) => {
         if (event.target === cell) open();
       });
@@ -433,11 +482,6 @@ async function loadMonth() {
     setStatus(data.trackers.length ? "" : "No active trackers yet. Add one to begin.", data.trackers.length ? "" : "empty");
   } catch (error) {
     if (requestId !== monthRequestId) return;
-    if (error.status === 401 || error.status === 403) {
-      setSessionToken(null);
-      setAuthenticated(false);
-      return;
-    }
     setStatus(`${error.message}. Select a month to retry.`, "error");
   } finally {
     if (requestId === monthRequestId) {
@@ -622,6 +666,17 @@ function trackerField(value, type = "text") {
   return input;
 }
 
+function confirmTrackerDeletion(name) {
+  elements.deleteTrackerName.textContent = name;
+  elements.deleteTrackerDialog.returnValue = "cancel";
+  elements.deleteTrackerDialog.showModal();
+  return new Promise((resolve) => {
+    elements.deleteTrackerDialog.addEventListener("close", () => {
+      resolve(elements.deleteTrackerDialog.returnValue === "confirm");
+    }, { once: true });
+  });
+}
+
 function renderTrackerManager(trackers) {
   const fragment = document.createDocumentFragment();
   const headings = document.createElement("div");
@@ -723,13 +778,18 @@ function renderTrackerManager(trackers) {
     type.addEventListener("change", saveTracker);
     active.addEventListener("change", saveTracker);
     remove.addEventListener("click", async () => {
-      if (!window.confirm(`Delete ${name.value}? Its entries will also be removed.`)) return;
+      const confirmed = await confirmTrackerDeletion(name.value);
+      if (!confirmed) return;
+      remove.disabled = true;
+      remove.textContent = "DELETING";
       try {
         await request(`/tracker/trackers/${tracker.id}/delete/`, { method: "DELETE" });
         await loadTrackerManager();
         await loadMonth();
       } catch (error) {
         elements.trackerError.textContent = error.message;
+        remove.disabled = false;
+        remove.textContent = "DELETE";
       }
     });
     fragment.append(row);
@@ -783,31 +843,126 @@ async function createTracker(event) {
 function updateAuthMode() {
   elements.authTitle.textContent = isSignUp ? "Create account" : "Sign in";
   elements.authCopy.textContent = isSignUp
-    ? "Create a private account for your trackers."
-    : "Sign in to load your trackers.";
+    ? "Create your account and start logging."
+    : "Welcome back. Sign in to open your log.";
   elements.authPassword.autocomplete = isSignUp ? "new-password" : "current-password";
-  elements.authForm.querySelector('[type="submit"]').textContent = isSignUp ? "CREATE ACCOUNT" : "SIGN IN";
-  elements.authToggle.textContent = isSignUp ? "Already have an account? Sign in" : "Create an account";
+  elements.authConfirmPasswordField.hidden = !isSignUp;
+  elements.authConfirmPassword.required = isSignUp;
+  elements.authForm.querySelector('[type="submit"]').textContent = isSignUp
+    ? "CREATE ACCOUNT"
+    : "SIGN IN";
+  elements.authToggle.textContent = isSignUp
+    ? "Already have an account? Sign in"
+    : "Create an account";
   elements.authError.textContent = "";
 }
 
 async function submitAuth(event) {
   event.preventDefault();
   elements.authError.textContent = "";
+  if (isSignUp && elements.authPassword.value !== elements.authConfirmPassword.value) {
+    elements.authError.textContent = "Passwords do not match.";
+    elements.authConfirmPassword.focus();
+    return;
+  }
   const submit = elements.authForm.querySelector('[type="submit"]');
   submit.disabled = true;
   try {
     const path = isSignUp ? "/_allauth/app/v1/auth/signup" : "/_allauth/app/v1/auth/login";
     await request(path, {
       method: "POST",
-      body: JSON.stringify({ email: elements.authEmail.value, password: elements.authPassword.value }),
+      body: JSON.stringify({
+        email: elements.authEmail.value,
+        password: elements.authPassword.value,
+      }),
     });
-    setAuthenticated(true);
-    await loadMonth();
+    elements.authForm.reset();
+    if (isSignUp) {
+      window.location.assign("username.html");
+      return;
+    }
+    await enterAuthenticatedApp();
   } catch (error) {
     elements.authError.textContent = error.message;
   } finally {
     submit.disabled = false;
+  }
+}
+
+async function enterAuthenticatedApp() {
+  const profile = await request("/tracker/profile/username/");
+  if (!profile.is_complete) {
+    window.location.assign("username.html");
+    return;
+  }
+  setAuthState("authenticated");
+  await loadMonth();
+}
+
+function loadGoogleIdentityServices() {
+  if (window.google?.accounts?.id) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const source = "https://accounts.google.com/gsi/client";
+    const existing = document.querySelector(`script[src="${source}"]`);
+    const script = existing || document.createElement("script");
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", () => reject(new Error("Google sign-in could not be loaded.")), { once: true });
+    if (!existing) {
+      script.src = source;
+      script.async = true;
+      script.defer = true;
+      document.head.append(script);
+    }
+  });
+}
+
+async function setupGoogleSignIn() {
+  try {
+    const config = await request("/_allauth/app/v1/config");
+    const provider = findSocialProvider(config, "google");
+    if (!provider?.client_id || !provider.flows?.includes("provider_token")) return;
+
+    await loadGoogleIdentityServices();
+    elements.googleAuth.hidden = false;
+    elements.authDivider.hidden = false;
+
+    window.google.accounts.id.initialize({
+      client_id: provider.client_id,
+      callback: async ({ credential }) => {
+        if (!credential) return;
+        elements.authError.textContent = "";
+        elements.googleAuth.setAttribute("aria-busy", "true");
+        try {
+          await request("/_allauth/app/v1/auth/provider/token", {
+            method: "POST",
+            body: JSON.stringify({
+              provider: "google",
+              process: "login",
+              token: {
+                client_id: provider.client_id,
+                id_token: credential,
+              },
+            }),
+          });
+          await enterAuthenticatedApp();
+        } catch (error) {
+          elements.authError.textContent = error.message;
+        } finally {
+          elements.googleAuth.setAttribute("aria-busy", "false");
+        }
+      },
+    });
+
+    window.google.accounts.id.renderButton(elements.googleAuth, {
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+      shape: "rectangular",
+      width: Math.max(200, Math.min(380, elements.googleAuth.clientWidth)),
+    });
+  } catch (_error) {
+    // Email/password authentication remains available if Google is blocked.
   }
 }
 
@@ -819,79 +974,19 @@ async function signOut() {
   } finally {
     setSessionToken(null);
     monthData = null;
-    setAuthenticated(false);
-  }
-}
-
-async function setupGoogleSignIn() {
-  try {
-    const config = await request("/config/public/");
-    const clientId = config?.google_client_id;
-    if (!clientId) return;
-
-    const loadGoogle = new Promise((resolve, reject) => {
-      if (window.google?.accounts?.id) {
-        resolve();
-        return;
-      }
-      const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-      const script = existing || document.createElement("script");
-      script.addEventListener("load", resolve, { once: true });
-      script.addEventListener("error", reject, { once: true });
-      if (!existing) {
-        script.src = "https://accounts.google.com/gsi/client";
-        script.async = true;
-        script.defer = true;
-        document.head.append(script);
-      }
-    });
-    await loadGoogle;
-
-    elements.googleAuth.hidden = false;
-    elements.authDivider.hidden = false;
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: async ({ credential }) => {
-        if (!credential) return;
-        elements.authError.textContent = "";
-        try {
-          await request("/_allauth/app/v1/auth/provider/token", {
-            method: "POST",
-            body: JSON.stringify({
-              provider: "google",
-              process: "login",
-              token: { client_id: clientId, id_token: credential },
-            }),
-          });
-          setAuthenticated(true);
-          await loadMonth();
-        } catch (error) {
-          elements.authError.textContent = error.message;
-        }
-      },
-    });
-    window.google.accounts.id.renderButton(elements.googleAuth, {
-      theme: "outline",
-      size: "large",
-      text: "continue_with",
-      shape: "rectangular",
-      width: 380,
-    });
-  } catch (_error) {
-    // Google is optional; email/password authentication remains available.
+    setAuthState("unauthenticated");
   }
 }
 
 async function bootstrap() {
-  setAuthenticated(false);
+  setAuthState("loading");
   try {
     const session = await request("/_allauth/app/v1/auth/session");
     if (!session?.data?.user) throw new ApiError("Not authenticated", 401, session);
-    setAuthenticated(true);
-    await loadMonth();
+    await enterAuthenticatedApp();
   } catch (error) {
     if (![401, 403, 410].includes(error.status)) elements.authError.textContent = error.message;
-    setAuthenticated(false);
+    setAuthState("unauthenticated");
   }
 }
 
@@ -933,12 +1028,19 @@ elements.authToggle.addEventListener("click", () => {
   isSignUp = !isSignUp;
   updateAuthMode();
 });
+document.querySelectorAll("[data-auth-mode]").forEach((link) => {
+  link.addEventListener("click", () => {
+    isSignUp = link.dataset.authMode === "signup";
+    updateAuthMode();
+  });
+});
 elements.signOut.addEventListener("click", signOut);
 document.querySelectorAll("[data-close]").forEach((button) => {
   button.addEventListener("click", () => document.querySelector(`#${button.dataset.close}`).close());
 });
 
-renderMonthHeading();
-updateAuthMode();
-setupGoogleSignIn();
-bootstrap();
+if (!canonicalUrl) {
+  renderMonthHeading();
+  setupGoogleSignIn();
+  bootstrap();
+}

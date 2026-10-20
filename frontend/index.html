@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#F9F7F3" />
     <meta name="api-base-url" content="" />
-    <title>Life Tracker</title>
+    <meta name="description" content="LIFELOG is a calm, spreadsheet-style tracker for turning daily signals into a life you can read." />
+    <title>LIFELOG — Build a life you can read</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -21,12 +22,17 @@
         <a class="brand-title" href="/" aria-label="Lifelog home">LIFELOG</a>
       </div>
       <div class="topbar-actions">
-        <button class="secondary-button" id="manage-trackers" type="button">TRACKERS</button>
-        <button class="log-entry-button" id="log-entry" type="button">+ LOG ENTRY</button>
+        <nav class="marketing-nav" id="marketing-nav" aria-label="Landing page" hidden>
+          <a href="#method">METHOD</a>
+          <a href="#access" data-auth-mode="signin">SIGN IN</a>
+          <a class="marketing-nav-cta" href="#access" data-auth-mode="signup">START TRACKING</a>
+        </nav>
+        <button class="secondary-button" id="manage-trackers" type="button" hidden>TRACKERS</button>
+        <button class="log-entry-button" id="log-entry" type="button" hidden>+ LOG ENTRY</button>
         <button class="secondary-button" id="sign-out" type="button" hidden>SIGN OUT</button>
       </div>
     </div>
-    <main id="app">
+    <main id="app" hidden>
       <div class="dashboard-content">
         <section class="month-section" aria-labelledby="month-section-label">
           <div class="month-toolbar">
@@ -59,18 +65,109 @@
     </main>
 
     <div class="auth-view" id="auth-view" hidden>
-      <form class="auth-panel" id="auth-form">
-        <p class="index-tag">PRIVATE LIFELOG</p>
-        <h2 id="auth-title">Sign in</h2>
-        <p class="form-copy" id="auth-copy">Sign in to load your trackers.</p>
-        <div class="google-auth" id="google-auth" hidden></div>
-        <div class="auth-divider" id="auth-divider" hidden><span></span><small>OR</small><span></span></div>
-        <label>Email<input id="auth-email" type="email" autocomplete="email" required /></label>
-        <label>Password<input id="auth-password" type="password" autocomplete="current-password" required /></label>
-        <p class="form-error" id="auth-error" role="alert"></p>
-        <button class="log-entry-button form-submit" type="submit">SIGN IN</button>
-        <button class="text-button" id="auth-toggle" type="button">Create an account</button>
-      </form>
+      <main class="landing-main">
+        <section class="landing-hero" aria-labelledby="landing-title">
+          <div class="hero-copy">
+            <p class="landing-kicker"><span>01</span> A PERSONAL DATA PRACTICE</p>
+            <h1 id="landing-title">Build a life<br /><em>you can read.</em></h1>
+            <p class="hero-lede">Track the handful of signals that shape your days. No noisy feed, no forced streaks—just a clear record of what happened.</p>
+            <div class="hero-actions">
+              <a class="landing-primary-button" href="#access" data-auth-mode="signup">START TRACKING <span aria-hidden="true">↗</span></a>
+              <a class="landing-text-link" href="#product-preview">SEE THE FORMAT <span aria-hidden="true">↓</span></a>
+            </div>
+            <p class="hero-note">SET UP IN MINUTES · EDIT INLINE · REVIEW BY MONTH</p>
+          </div>
+
+          <div class="product-preview" id="product-preview" aria-label="Illustrative LIFELOG monthly tracker">
+            <div class="preview-bar">
+              <span>LIFELOG / OCTOBER</span>
+              <span class="preview-live"><i></i> LIVE VIEW</span>
+            </div>
+            <div class="preview-heading">
+              <div><small>MONTH 10 / 12</small><strong>OCTOBER 2026</strong></div>
+              <span>18 / 31 DAYS</span>
+            </div>
+            <div class="preview-grid" role="presentation">
+              <div class="preview-cell preview-head">DATE</div><div class="preview-cell preview-head">SLEEP</div><div class="preview-cell preview-head">MOVE</div><div class="preview-cell preview-head">MOOD</div><div class="preview-cell preview-head preview-wide">NOTE</div>
+              <div class="preview-cell preview-date">MON 12</div><div class="preview-cell">7H 40M</div><div class="preview-cell preview-good">YES</div><div class="preview-cell">4/5</div><div class="preview-cell preview-wide preview-note">Deep work, clear head.</div>
+              <div class="preview-cell preview-date">TUE 13</div><div class="preview-cell">6H 55M</div><div class="preview-cell preview-good">YES</div><div class="preview-cell">3/5</div><div class="preview-cell preview-wide preview-note">Long afternoon.</div>
+              <div class="preview-cell preview-date">WED 14</div><div class="preview-cell">8H 10M</div><div class="preview-cell preview-bad">NO</div><div class="preview-cell">4/5</div><div class="preview-cell preview-wide preview-note">Dinner with friends.</div>
+              <div class="preview-cell preview-date">THU 15</div><div class="preview-cell">7H 20M</div><div class="preview-cell preview-good">YES</div><div class="preview-cell preview-active">5/5</div><div class="preview-cell preview-wide preview-note">Best energy all week.</div>
+              <div class="preview-cell preview-date">FRI 16</div><div class="preview-cell">—</div><div class="preview-cell">—</div><div class="preview-cell">—</div><div class="preview-cell preview-wide preview-note">Click any cell to log.</div>
+            </div>
+            <div class="preview-summary">
+              <div><small>AVG. SLEEP</small><strong>7H 31M</strong></div>
+              <div><small>MOVEMENT</small><strong>75%</strong></div>
+              <div><small>AVG. MOOD</small><strong>4.0/5</strong></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="signal-strip" aria-label="Supported tracker formats">
+          <span>BINARY</span><i>+</i><span>NUMBER</span><i>+</i><span>TIME</span><i>+</i><span>DURATION</span><i>+</i><span>RATING</span><i>+</i><span>NOTES</span>
+        </div>
+
+        <section class="landing-manifesto" id="method" aria-labelledby="method-title">
+          <div class="section-index">
+            <span>02 / METHOD</span>
+            <span>LESS NOISE. MORE SIGNAL.</span>
+          </div>
+          <div class="manifesto-copy">
+            <h2 id="method-title">You don’t need to quantify everything.</h2>
+            <p>You need a small set of honest signals, recorded consistently enough to reveal the shape of your days.</p>
+          </div>
+          <ol class="method-list">
+            <li><span>01</span><div><h3>Choose your signals</h3><p>Create columns for what matters now—from sleep and movement to prayer, focus, mood, or a single daily note.</p></div></li>
+            <li><span>02</span><div><h3>Log without friction</h3><p>Click a cell, enter the value, move on. Typed fields keep each signal useful without slowing you down.</p></div></li>
+            <li><span>03</span><div><h3>Read the month</h3><p>See days together, spot the gaps, and use monthly summaries to notice patterns worth acting on.</p></div></li>
+          </ol>
+        </section>
+
+        <section class="format-section" aria-labelledby="format-title">
+          <div class="section-index">
+            <span>03 / YOUR FORMAT</span>
+            <span>BUILT TO CHANGE WITH YOU.</span>
+          </div>
+          <div class="format-heading">
+            <h2 id="format-title">One grid.<br />Whatever matters.</h2>
+            <p>Start small. Add, reorder, or pause trackers as your attention shifts. Your system should follow your life—not the other way around.</p>
+          </div>
+          <div class="format-cards">
+            <article><span>Y / N</span><h3>Did it happen?</h3><p>Binary habits and commitments.</p></article>
+            <article><span>0—∞</span><h3>How much?</h3><p>Counts, quantities, and measures.</p></article>
+            <article><span>HH:MM</span><h3>When or how long?</h3><p>Times and durations that add context.</p></article>
+            <article><span>1—5</span><h3>How did it feel?</h3><p>Ratings for subjective signals.</p></article>
+            <article><span>TXT</span><h3>What stood out?</h3><p>Short notes for the texture behind the data.</p></article>
+          </div>
+        </section>
+
+        <section class="access-section" id="access" aria-labelledby="access-title">
+          <div class="access-copy">
+            <p class="landing-kicker"><span>04</span> BEGIN WHERE YOU ARE</p>
+            <h2 id="access-title">Start with<br />one signal.</h2>
+            <p>The best tracking system is the one quiet enough to keep using.</p>
+          </div>
+          <form class="auth-panel" id="auth-form">
+            <p class="index-tag">YOUR LIFELOG</p>
+            <h2 id="auth-title">Sign in</h2>
+            <p class="form-copy" id="auth-copy">Checking your session…</p>
+            <div class="google-auth" id="google-auth" aria-label="Google sign in" hidden></div>
+            <div class="auth-divider" id="auth-divider" hidden><span></span><small>OR</small><span></span></div>
+            <label>Email<input id="auth-email" type="email" autocomplete="email" required /></label>
+            <label>Password<input id="auth-password" type="password" autocomplete="current-password" required /></label>
+            <label id="auth-confirm-password-field" hidden>Confirm password<input id="auth-confirm-password" type="password" autocomplete="new-password" /></label>
+            <p class="form-error" id="auth-error" role="alert"></p>
+            <button class="log-entry-button form-submit" type="submit">SIGN IN</button>
+            <button class="text-button" id="auth-toggle" type="button">Create an account</button>
+          </form>
+        </section>
+
+        <footer class="landing-footer">
+          <a class="brand-title" href="/">LIFELOG</a>
+          <p>A clearer record of the days that make a life.</p>
+          <a href="#landing-title">BACK TO TOP ↑</a>
+        </footer>
+      </main>
     </div>
 
     <dialog class="app-dialog" id="entry-dialog">
@@ -115,6 +212,28 @@
         </form>
         <p class="form-error" id="tracker-error" role="alert"></p>
       </div>
+    </dialog>
+
+    <dialog
+      class="app-dialog confirmation-dialog"
+      id="delete-tracker-dialog"
+      aria-labelledby="delete-tracker-title"
+      aria-describedby="delete-tracker-copy"
+    >
+      <form class="dialog-form confirmation-panel" method="dialog">
+        <div class="confirmation-mark" aria-hidden="true">!</div>
+        <div>
+          <p class="index-tag">DESTRUCTIVE ACTION</p>
+          <h2 id="delete-tracker-title">Delete tracker?</h2>
+        </div>
+        <p class="confirmation-copy" id="delete-tracker-copy">
+          <strong id="delete-tracker-name"></strong> and all of its entries will be permanently removed. This cannot be undone.
+        </p>
+        <div class="dialog-actions confirmation-actions">
+          <button class="secondary-button" type="submit" value="cancel" autofocus>CANCEL</button>
+          <button class="destructive-button" id="confirm-tracker-delete" type="submit" value="confirm">DELETE TRACKER</button>
+        </div>
+      </form>
     </dialog>
 
     <script type="module" src="./app.js"></script>

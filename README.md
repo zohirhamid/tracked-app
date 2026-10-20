@@ -1,15 +1,15 @@
 # TRACKED
 
-TRACKED is a Django REST API for spreadsheet-style life tracking. Users create custom tracker columns and record typed values against calendar dates.
+TRACKED is a Django REST API and static frontend for spreadsheet-style life tracking. Signed-in users can create shared tracker columns and record typed values against calendar dates.
 
 ## Features
 
-- Email/password and Google authentication through Django Allauth
-- User-owned trackers with configurable ordering and active state
+- Email/password authentication through Django Allauth
+- Authenticated API with shared trackers and entries
+- Trackers with configurable ordering and active state
 - Binary, number, time, duration, text, rating, and prayer tracker types
 - Monthly calendar data grouped into weeks
-- Typed entry validation and per-user data isolation
-- Django admin for profiles, trackers, daily snapshots, and entries
+- Typed entry validation
 - SQLite for local development or PostgreSQL through `DATABASE_URL`
 
 ## Local setup
@@ -24,9 +24,11 @@ pip install -r requirements.txt
 export SECRET_KEY=development-secret
 export DJANGO_DEBUG=True
 python manage.py migrate
-python manage.py create_demo_user
 python manage.py runserver
 ```
+
+The tracker data is shared between authenticated users; the current schema does
+not assign trackers or entries to individual accounts.
 
 Start the frontend in another terminal:
 
@@ -38,29 +40,16 @@ python3 -m http.server 5173
 Open `http://localhost:5173`. The API is available at
 `http://localhost:8000/api/v1/`.
 
-The demo account is `demo@example.com` with password `london2024`. Its sample
-entries are in January 2026.
-
 The static frontend reads its API origin from the `api-base-url` meta tag in
 `frontend/index.html`. When the tag is empty, local hosts default to port 8000
 and deployed builds default to the same origin under `/api/v1`.
 
-Run the integration-focused backend tests with:
-
-```bash
-cd backend
-export SECRET_KEY=test-secret
-export DJANGO_DEBUG=True
-.venv/bin/python manage.py test apps.tracker.test_month_api
-```
-
 ## Main endpoints
 
 ```text
-GET    /api/v1/config/public/
-GET    /api/v1/auth/csrf/
-       /api/v1/_allauth/
-
+       /api/v1/_allauth/app/v1/auth/
+GET    /api/v1/tracker/profile/username/
+POST   /api/v1/tracker/profile/username/
 GET    /api/v1/tracker/month/<year>/<month>/
 GET    /api/v1/tracker/trackers/
 POST   /api/v1/tracker/trackers/create/
@@ -78,6 +67,4 @@ DJANGO_DEBUG=True
 COOKIE_SECURE=False
 USE_POSTGRES=False
 DATABASE_URL=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
 ```

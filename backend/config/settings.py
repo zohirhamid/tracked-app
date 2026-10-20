@@ -63,78 +63,62 @@ TEMPLATES = [
     },
 ]
 
-
-# ─────────────────────────────────────────────
-# CSRF & CORS (REACT)
-# ─────────────────────────────────────────────
+# The static frontend runs on a separate origin during local development.
+# Session cookies and the allauth app-session header must both be accepted.
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    # Support Python's IPv6 development-server URL.
+    "http://[::]:5173",
+    "http://[::1]:5173",
     "https://tracked.zohirhamid.com",
 ]
 
-_cookie_secure_env = os.getenv("COOKIE_SECURE")
-if _cookie_secure_env is None:
-    COOKIE_SECURE = not DEBUG
-else:
-    COOKIE_SECURE = _cookie_secure_env.lower() in {"1", "true", "yes", "on"}
-
-if COOKIE_SECURE:
-    CSRF_COOKIE_SAMESITE = "None"
-    SESSION_COOKIE_SAMESITE = "None"
-else:
-    CSRF_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_SAMESITE = "Lax"
-
+_cookie_secure_raw = os.getenv("COOKIE_SECURE")
+COOKIE_SECURE = (
+    not DEBUG
+    if _cookie_secure_raw is None
+    else _parse_bool(_cookie_secure_raw, default=not DEBUG)
+)
 CSRF_COOKIE_SECURE = COOKIE_SECURE
 SESSION_COOKIE_SECURE = COOKIE_SECURE
+CSRF_COOKIE_SAMESITE = "None" if COOKIE_SECURE else "Lax"
+SESSION_COOKIE_SAMESITE = "None" if COOKIE_SECURE else "Lax"
 
 CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "x-session-token",
-]
+CORS_ALLOW_HEADERS = [*default_headers, "x-session-token"]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://[::]:5173",
+    "http://[::1]:5173",
     "https://tracked.zohirhamid.com",
 ]
-
-# ─────────────────────────────────────────────
-# API KEYS
-# ─────────────────────────────────────────────
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 # ─────────────────────────────────────────────
 # APPLICATIONS
 # ─────────────────────────────────────────────
 INSTALLED_APPS = [
-    # Django
-    "django.contrib.admin",
-    "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.auth",
+    # Gives allauth access to the current domain through Django's Site model.
+    "django.contrib.sites",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",
-    "django.contrib.sites",
 
-    # Third-party
-    "rest_framework",
-    "corsheaders",
-
-    #
+    # Provides django-allauth's shared authentication infrastructure.
     "allauth",
+    # Enables email/password signup, login, logout, and account management.
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "allauth.headless",
 
+    "django.contrib.staticfiles",
+    # Third-party
+    "rest_framework",
+    "corsheaders",
     # Local apps
     "apps.tracker",
 ]
@@ -143,27 +127,19 @@ INSTALLED_APPS = [
 if importlib.util.find_spec("django_extensions") is not None:
     INSTALLED_APPS.append("django_extensions")
 
-SITE_ID = 1
-
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
+    "allauth.account.auth_backends.AuthenticationBackend", #
 ]
 
-ACCOUNT_LOGIN_METHODS = {"email"} # makes login email based
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"] # keeps signup minimal: no username, no extra fields
-ACCOUNT_EMAIL_VERIFICATION = "none" # no email verification
-ACCOUNT_UNIQUE_EMAIL = True # makes email unique identity
+SITE_ID = 1 #
 
-SOCIALACCOUNT_PROVIDERS = {
-    "google": {
-        "SCOPE": ["profile", "email"],
-        "AUTH_PARAMS": {"access_type": "online"},
-    }
-}
-
-HEADLESS_ONLY = True # tells allauth you are using the API/headless flow instead of the classic browser pages
-
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+# Lets users sign in immediately without first confirming their email address.
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_UNIQUE_EMAIL = True
+HEADLESS_ONLY = False
 
 # ─────────────────────────────────────────────
 # MIDDLEWARE
@@ -177,20 +153,50 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+    # Adds allauth account information and helpers to each request.
     "allauth.account.middleware.AccountMiddleware",
 ]
 
+# Google OAuth credentials belong in the environment, never in source control.
+# The client ID is also safe to expose through a public-config API when the
+# frontend initializes Google Identity Services; the client secret is not.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        # Register the Google OAuth application directly from environment
+        # variables instead of requiring a SocialApp record in Django admin.
+        "APP": {
+            "client_id": GOOGLE_CLIENT_ID,
+            "secret": GOOGLE_CLIENT_SECRET,
+            "key": "",
+        },
+        # Request only the identity information required to create/sign in a
+        # TRACKED account.
+        "SCOPE": ["profile", "email"],
+        # A short-lived online token is sufficient; no offline refresh token
+        # is needed because Google is used only for authentication.
+        "AUTH_PARAMS": {"access_type": "online"},
+    }
+}
+
+# Google marks the returned email as verified. Allow that verified address to
+# sign in to an existing email/password account and attach the Google identity
+# so the same person does not end up with duplicate accounts.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+
 # ─────────────────────────────────────────────
-# REST FRAMEWORK (AUTH)
+# REST FRAMEWORK
 # ─────────────────────────────────────────────
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "allauth.headless.contrib.rest_framework.authentication.XSessionTokenAuthentication",
-        'rest_framework.authentication.SessionAuthentication',
-    ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
 }
 
 
@@ -222,7 +228,7 @@ else:
     }
 
 # ─────────────────────────────────────────────
-# STATIC (ADMIN ONLY)
+# STATIC FILES
 # ─────────────────────────────────────────────
 STATIC_URL = "/static/"
 
@@ -233,11 +239,6 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-
-# ─────────────────────────────────────────────
-# EMAIL (DEV)
-# ─────────────────────────────────────────────
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # ─────────────────────────────────────────────
 # DEFAULTS
@@ -267,3 +268,5 @@ LOGGING = {
         },
     },
 }
+
+LOGIN_REDIRECT_URL = "/"  # redirect users to the homepage after logging in

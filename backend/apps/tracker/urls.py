@@ -8,11 +8,14 @@ from .views import (
     TrackerDeleteView,
     EntryCreateView,
     EntryDeleteView,
+    UsernameView,
 )
 
 app_name = 'tracker'
 
 urlpatterns = [
+    path('profile/username/', UsernameView.as_view(), name='profile_username'),
+
     # Month view
     path('month/<int:year>/<int:month>/', MonthView.as_view(), name='month_view'),
 

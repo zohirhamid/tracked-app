@@ -1,12 +1,84 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { dateParts, entryTone, flattenDays, formatEntry } from "./lib.mjs";
+import {
+  apiBaseUrl,
+  canonicalDevelopmentUrl,
+  dateParts,
+  entryTone,
+  findSocialProvider,
+  flattenDays,
+  formatEntry,
+  updateMonthEntry,
+} from "./lib.mjs";
+
+test("resolves API URLs for local IPv4, IPv6, and deployed frontends", () => {
+  assert.equal(
+    apiBaseUrl("", { protocol: "http:", hostname: "localhost" }),
+    "http://localhost:8000/api/v1",
+  );
+  assert.equal(
+    apiBaseUrl("", { protocol: "http:", hostname: "[::]" }),
+    "http://localhost:8000/api/v1",
+  );
+  assert.equal(
+    apiBaseUrl("", { protocol: "https:", hostname: "tracked.example" }),
+    "/api/v1",
+  );
+  assert.equal(
+    apiBaseUrl("https://api.example/v1/", { protocol: "http:", hostname: "[::]" }),
+    "https://api.example/v1",
+  );
+});
+
+test("canonicalizes development host aliases for OAuth origin matching", () => {
+  assert.equal(
+    canonicalDevelopmentUrl({ hostname: "[::]", href: "http://[::]:5173/?next=home" }),
+    "http://localhost:5173/?next=home",
+  );
+  assert.equal(
+    canonicalDevelopmentUrl({ hostname: "localhost", href: "http://localhost:5173/" }),
+    null,
+  );
+});
 
 test("flattens API weeks without changing day order", () => {
   assert.deepEqual(flattenDays([[{ day: 1 }, { day: 2 }], [{ day: 3 }]]), [
     { day: 1 }, { day: 2 }, { day: 3 },
   ]);
+});
+
+test("updates one entry and summary in cached month data", () => {
+  const month = {
+    weeks: [[{ date: "2026-10-18", entries: { 1: { rating_value: 2 } } }]],
+    summaries: [{ tracker_id: 1, display: "2.0/5", count: 1 }],
+  };
+  const entry = { id: 9, rating_value: 4 };
+  const summary = { tracker_id: 1, display: "4.0/5", count: 1 };
+
+  assert.equal(updateMonthEntry(month, "2026-10-18", 1, entry, summary), true);
+  assert.equal(month.weeks[0][0].entries[1], entry);
+  assert.equal(month.summaries[0], summary);
+
+  assert.equal(updateMonthEntry(month, "2026-10-18", 1, null, { ...summary, count: 0 }), true);
+  assert.equal(month.weeks[0][0].entries[1], undefined);
+  assert.equal(month.summaries[0].count, 0);
+});
+
+test("finds a provider in the allauth public config", () => {
+  const google = findSocialProvider({
+    data: {
+      socialaccount: {
+        providers: [
+          { id: "github", client_id: "github-id" },
+          { id: "google", client_id: "google-id", flows: ["provider_token"] },
+        ],
+      },
+    },
+  }, "google");
+
+  assert.equal(google.client_id, "google-id");
+  assert.equal(findSocialProvider({}, "google"), null);
 });
 
 test("parses ISO calendar dates in local time", () => {

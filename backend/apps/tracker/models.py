@@ -1,24 +1,23 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from decimal import Decimal
 from datetime import datetime
 
-User = get_user_model()
 
-class Profile(models.Model):
-    """
-    Extra information about the user that django's user model doesn't have.
-    """
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    avatar_url = models.URLField(blank=True)
-    google_id = models.CharField(max_length=100, blank=True)
+class AccountSetup(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="account_setup",
+    )
+    username_is_set = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Profile: {self.user.email}"
+        return f"Account setup for {self.user_id}"
 
 class Tracker(models.Model):
     """
-    Defines WHAT the user wants to track.
+    Defines WHAT to track.
     replaces the column header in Excel sheet.
     """
     id:int
@@ -32,7 +31,6 @@ class Tracker(models.Model):
         ('prayer', 'Islamic Prayer (5x)'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     tracker_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     unit = models.CharField(max_length=20, blank=True, null=True)
@@ -48,23 +46,21 @@ class Tracker(models.Model):
         ordering = ['display_order', 'created_at']
     
     def __str__(self):
-        return f"{self.name} ({self.user.email})"
+        return self.name
 
 
 class DailySnapshot(models.Model):
     """
-    Represents ONE DAY for ONE USER. (a row in excel)
+    Represents one day in the tracking sheet.
     its a container that groups all entries for a certain day.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    date = models.DateField()
+    date = models.DateField(unique=True)
     
     class Meta:
-        unique_together = ['user', 'date']
         ordering = ['-date']
     
     def __str__(self):
-        return f"{self.user.email} - {self.date}"
+        return str(self.date)
 
 
 class Entry(models.Model):
