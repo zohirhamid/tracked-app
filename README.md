@@ -44,6 +44,21 @@ The static frontend reads its API origin from the `api-base-url` meta tag in
 `frontend/index.html`. When the tag is empty, local hosts default to port 8000
 and deployed builds default to the same origin under `/api/v1`.
 
+## Deployment
+
+The production Django process serves the frontend and collected static files
+through WhiteNoise, so no separate frontend server or Node build is required.
+
+From the `backend` directory, collect Django's static files and start Gunicorn:
+
+```bash
+python manage.py collectstatic --noinput
+gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}
+```
+
+The frontend is available at `/`, the account setup page at `/username.html`,
+and the deployment health check at `/health/`.
+
 ## Main endpoints
 
 ```text
@@ -65,6 +80,7 @@ DELETE /api/v1/tracker/entries/<id>/delete/
 SECRET_KEY=
 DJANGO_DEBUG=True
 COOKIE_SECURE=False
-USE_POSTGRES=False
 DATABASE_URL=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 ```

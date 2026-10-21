@@ -1,6 +1,13 @@
+from django.http import JsonResponse
 from django.urls import include, path
 
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path("health/", health_check, name="health_check"),
     # Allauth's app client issues X-Session-Token credentials to the static frontend.
     path("api/v1/_allauth/", include("allauth.headless.urls")),
     path('accounts/', include('allauth.urls')), #

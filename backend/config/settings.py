@@ -1,51 +1,43 @@
-import os
 import importlib.util
+import os
 from pathlib import Path
-from dotenv import load_dotenv, dotenv_values
+
 import dj_database_url
+from dotenv import load_dotenv
 from corsheaders.defaults import default_headers
 
 # ─────────────────────────────────────────────
 # BASE CONFIG
 # ─────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv()
+load_dotenv(BASE_DIR.parent / ".env")
 
-def _parse_bool(value, *, default=False):
+
+def env_bool(name, *, default=False):
+    value = os.getenv(name)
     if value is None:
         return default
-    normalized = str(value).strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    return default
+
+    normalized = value.strip().lower()
+    if normalized not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
+        raise ValueError(f"{name} must be a boolean value")
+    return normalized in {"1", "true", "yes", "on"}
+
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set")
 
-_debug_raw = os.getenv("DJANGO_DEBUG")
-if _debug_raw is None:
-    # Avoid collisions with platform-provided DEBUG values like "release".
-    _env_debug = os.getenv("DEBUG")
-    if _env_debug is not None and str(_env_debug).strip().lower() in {
-        "1", "true", "yes", "on", "0", "false", "no", "off",
-    }:
-        _debug_raw = _env_debug
-    else:
-        _dotenv_path = BASE_DIR / ".env"
-        if _dotenv_path.exists():
-            _debug_raw = dotenv_values(_dotenv_path).get("DEBUG")
+DEBUG = env_bool("DJANGO_DEBUG")
 
-DEBUG = _parse_bool(_debug_raw, default=False)
-
+# Hostnames Django may serve, protecting against forged Host headers.
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
     "tracked.zohirhamid.com",
     "api.tracked.zohirhamid.com",
+    "tracked-app-production-8314.up.railway.app",
 ]
 
 TEMPLATES = [
@@ -74,12 +66,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://tracked.zohirhamid.com",
 ]
 
-_cookie_secure_raw = os.getenv("COOKIE_SECURE")
-COOKIE_SECURE = (
-    not DEBUG
-    if _cookie_secure_raw is None
-    else _parse_bool(_cookie_secure_raw, default=not DEBUG)
-)
+COOKIE_SECURE = env_bool("COOKIE_SECURE", default=not DEBUG)
 CSRF_COOKIE_SECURE = COOKIE_SECURE
 SESSION_COOKIE_SECURE = COOKIE_SECURE
 CSRF_COOKIE_SAMESITE = "None" if COOKIE_SECURE else "Lax"
@@ -145,8 +132,9 @@ HEADLESS_ONLY = False
 # MIDDLEWARE
 # ─────────────────────────────────────────────
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -209,12 +197,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 # ─────────────────────────────────────────────
 # DATABASE
 # ─────────────────────────────────────────────
-USE_POSTGRES = os.getenv("USE_POSTGRES", "False") == "True"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if USE_POSTGRES:
+if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.config(
-            default=os.getenv("DATABASE_URL"),
+            default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
         )
@@ -231,6 +219,11 @@ else:
 # STATIC FILES
 # ─────────────────────────────────────────────
 STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Serve the dependency-free frontend from the same origin as the API.
+WHITENOISE_ROOT = BASE_DIR.parent / "frontend"
+WHITENOISE_INDEX_FILE = True
 
 # ─────────────────────────────────────────────
 # INTERNATIONALIZATION
