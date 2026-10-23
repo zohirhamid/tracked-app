@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test lib.test.mjs"
+    "test": "node --test lib.test.mjs",
+    "start": "serve -s dist -l $PORT"
   },
   "dependencies": {
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "serve": "^14.2.6"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
