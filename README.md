@@ -42,8 +42,8 @@ Open `http://localhost:5173`. The API is available at
 `http://localhost:8000/api/v1/`.
 
 The React frontend reads its API origin from the `api-base-url` meta tag in
-`frontend/index.html`. When the tag is empty, local hosts default to port 8000
-and deployed builds default to the same origin under `/api/v1`.
+`frontend/index.html`. It currently points to the Railway backend so that the
+separately deployed Railway frontend can call `/api/v1` there.
 
 ## Deployment
 
@@ -65,6 +65,22 @@ gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}
 
 The frontend is available at `/`; account setup is handled inside the React app.
 The deployment health check remains available at `/health/`.
+
+For the separate Railway services, use these origins:
+
+```text
+Frontend: https://frontend-production-9e32.up.railway.app
+Backend:  https://tracked-app-production-8314.up.railway.app
+```
+
+Set `FRONTEND_URL=https://frontend-production-9e32.up.railway.app` on the
+backend Railway service. The frontend origin is included in Django's CORS and
+CSRF trusted-origin settings. In Google Cloud Console, register this exact
+authorized redirect URI (including the trailing slash):
+
+```text
+https://tracked-app-production-8314.up.railway.app/accounts/google/login/callback/
+```
 
 ## Main endpoints
 

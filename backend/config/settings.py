@@ -72,6 +72,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://[::]:5173",
     "http://[::1]:5173",
     "https://tracked.zohirhamid.com",
+    "https://frontend-production-9e32.up.railway.app",
 ]
 
 COOKIE_SECURE = env_bool("COOKIE_SECURE", default=not DEBUG)
@@ -89,6 +90,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://[::]:5173",
     "http://[::1]:5173",
     "https://tracked.zohirhamid.com",
+    "https://frontend-production-9e32.up.railway.app",
 ]
 
 # ─────────────────────────────────────────────
@@ -138,7 +140,11 @@ HEADLESS_ONLY = True
 
 FRONTEND_URL = os.getenv(
     "FRONTEND_URL",
-    "http://localhost:5173" if DEBUG else "https://tracked.zohirhamid.com",
+    (
+        "http://localhost:5173"
+        if DEBUG
+        else "https://frontend-production-9e32.up.railway.app"
+    ),
 ).rstrip("/")
 
 # Any provider failure that occurs before Allauth can recover the callback URL
