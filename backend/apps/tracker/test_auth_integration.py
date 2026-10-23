@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.test import Client, override_settings
@@ -143,6 +145,30 @@ class AllauthFrontendIntegrationTests(APITestCase):
         self.client.credentials(HTTP_X_SESSION_TOKEN=new_token)
         accepted = self.client.get("/api/v1/tracker/trackers/")
         self.assertEqual(accepted.status_code, 200)
+
+    def test_browser_session_csrf_can_complete_username_setup(self):
+        user = get_user_model().objects.create_user(
+            username="google-user-initial",
+            email="google-user@example.com",
+        )
+        client = Client(enforce_csrf_checks=True, HTTP_HOST="localhost")
+        client.force_login(user)
+        origin = "http://localhost:5173"
+
+        csrf = client.get("/api/v1/auth/csrf/", HTTP_ORIGIN=origin)
+        csrf_token = csrf.json()["csrf_token"]
+        response = client.post(
+            "/api/v1/tracker/profile/username/",
+            data=json.dumps({"username": "google_user"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+            HTTP_ORIGIN=origin,
+            HTTP_REFERER=f"{origin}/",
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["username"], "google_user")
+        self.assertTrue(response.json()["is_complete"])
 
     def test_username_must_be_unique_ignoring_case(self):
         current_user = get_user_model().objects.create_user(

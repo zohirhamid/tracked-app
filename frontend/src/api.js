@@ -3,6 +3,8 @@ import { apiBaseUrl } from "../lib.mjs";
 const apiMeta = document.querySelector('meta[name="api-base-url"]');
 const API_BASE_URL = apiBaseUrl(apiMeta?.content, window.location);
 const SESSION_TOKEN_KEY = "lifelog_session_token";
+let crossOriginCsrfToken = "";
+let csrfTokenRequest = null;
 
 export function apiUrl(path) {
   return `${API_BASE_URL}${path}`;
@@ -10,7 +12,7 @@ export function apiUrl(path) {
 
 export function csrfToken() {
   const cookie = document.cookie.split("; ").find((item) => item.startsWith("csrftoken="));
-  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : "";
+  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : crossOriginCsrfToken;
 }
 
 export class ApiError extends Error {
@@ -35,8 +37,33 @@ function errorMessage(payload, fallback = "Request failed") {
   return typeof payload === "string" && payload ? payload : fallback;
 }
 
+export async function ensureCsrfToken() {
+  const existingToken = csrfToken();
+  if (existingToken) return existingToken;
+
+  if (!csrfTokenRequest) {
+    csrfTokenRequest = fetch(apiUrl("/auth/csrf/"), {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    }).then(async (response) => {
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new ApiError(errorMessage(payload, response.statusText), response.status, payload);
+      }
+      if (!payload?.csrf_token) throw new ApiError("CSRF token was not returned", 500, payload);
+      crossOriginCsrfToken = payload.csrf_token;
+      return crossOriginCsrfToken;
+    }).finally(() => {
+      csrfTokenRequest = null;
+    });
+  }
+
+  return csrfTokenRequest;
+}
+
 export function clearSessionToken() {
   window.localStorage.removeItem(SESSION_TOKEN_KEY);
+  crossOriginCsrfToken = "";
 }
 
 export async function request(path, options = {}, retryOnExpiredToken = true) {
@@ -44,8 +71,12 @@ export async function request(path, options = {}, retryOnExpiredToken = true) {
   headers.set("Accept", "application/json");
   const token = window.localStorage.getItem(SESSION_TOKEN_KEY);
   if (token) headers.set("X-Session-Token", token);
-  const csrf = csrfToken();
-  if (csrf && !["GET", "HEAD", "OPTIONS"].includes((options.method || "GET").toUpperCase())) {
+  const method = (options.method || "GET").toUpperCase();
+  const isUnsafe = !["GET", "HEAD", "OPTIONS"].includes(method);
+  const csrf = isUnsafe && !token && !path.startsWith("/_allauth/app/")
+    ? await ensureCsrfToken()
+    : csrfToken();
+  if (csrf && isUnsafe) {
     headers.set("X-CSRFToken", csrf);
   }
   if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
