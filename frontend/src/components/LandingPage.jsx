@@ -23,8 +23,12 @@ function GoogleAuth({ mode }) {
         // redirect endpoint is the source of truth for provider availability;
         // do not disable the button based on the optional provider listing.
         await request("/_allauth/browser/v1/config");
+        let token = csrfToken();
+        if (!token) {
+          const csrfResponse = await request("/auth/csrf/");
+          token = csrfResponse?.csrf_token;
+        }
         if (!active) return;
-        const token = csrfToken();
         if (!token) throw new Error("Google sign-in could not be initialized.");
         setCsrf(token);
         setStatus("ready");

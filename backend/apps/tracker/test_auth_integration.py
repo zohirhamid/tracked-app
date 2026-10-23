@@ -37,7 +37,17 @@ class AllauthFrontendIntegrationTests(APITestCase):
             google_provider["client_id"],
             "test-client.apps.googleusercontent.com",
         )
-        csrf_token = config.cookies["csrftoken"].value
+        csrf = client.get(
+            "/api/v1/auth/csrf/",
+            HTTP_ORIGIN="http://localhost:5173",
+        )
+        self.assertEqual(csrf.status_code, 200)
+        self.assertEqual(
+            csrf["Access-Control-Allow-Origin"],
+            "http://localhost:5173",
+        )
+        csrf_token = csrf.json()["csrf_token"]
+        self.assertTrue(csrf_token)
 
         response = client.post(
             "/api/v1/_allauth/browser/v1/auth/provider/redirect",

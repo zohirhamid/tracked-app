@@ -87,6 +87,7 @@ https://tracked-app-production-8314.up.railway.app/accounts/google/login/callbac
 
 ```text
        /api/v1/_allauth/app/v1/auth/
+GET    /api/v1/auth/csrf/
 GET    /api/v1/tracker/profile/username/
 POST   /api/v1/tracker/profile/username/
 GET    /api/v1/tracker/month/<year>/<month>/
