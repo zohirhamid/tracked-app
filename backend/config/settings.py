@@ -39,6 +39,7 @@ ALLOWED_HOSTS = [
     "api.tracked.zohirhamid.com",
     "tracked-app-production-8314.up.railway.app",
     "healthcheck.railway.app",
+    ".railway.app",
 ]
 
 TEMPLATES = [
