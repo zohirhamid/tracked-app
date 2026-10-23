@@ -27,6 +27,14 @@ test("resolves API URLs for local IPv4, IPv6, and deployed frontends", () => {
   );
   assert.equal(
     apiBaseUrl("https://api.example/v1/", { protocol: "http:", hostname: "[::]" }),
+    "http://localhost:8000/api/v1",
+  );
+  assert.equal(
+    apiBaseUrl("https://api.example/v1/", { protocol: "http:", hostname: "localhost" }),
+    "http://localhost:8000/api/v1",
+  );
+  assert.equal(
+    apiBaseUrl("https://api.example/v1/", { protocol: "https:", hostname: "tracked.example" }),
     "https://api.example/v1",
   );
 });

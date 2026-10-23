@@ -42,8 +42,9 @@ Open `http://localhost:5173`. The API is available at
 `http://localhost:8000/api/v1/`.
 
 The React frontend reads its API origin from the `api-base-url` meta tag in
-`frontend/index.html`. It currently points to the Railway backend so that the
-separately deployed Railway frontend can call `/api/v1` there.
+`frontend/index.html`. It points to the Railway backend for the separately
+deployed frontend. When the page itself is running on a local host, that value
+is intentionally ignored and the frontend calls the local API on port 8000.
 
 ## Deployment
 

@@ -26,9 +26,6 @@ export function findSocialProvider(config, providerId) {
 }
 
 export function apiBaseUrl(configuredValue, location) {
-  const configured = configuredValue?.trim().replace(/\/$/, "");
-  if (configured) return configured;
-
   const localHosts = new Set([
     "localhost",
     "127.0.0.1",
@@ -38,14 +35,18 @@ export function apiBaseUrl(configuredValue, location) {
     "::",
     "::1",
   ]);
-  if (!localHosts.has(location.hostname)) return "/api/v1";
+  if (localHosts.has(location.hostname)) {
+    // A deployment URL may be embedded in index.html, but a locally served
+    // frontend must use the local Django server. Otherwise its CSRF cookie is
+    // scoped to the remote API domain and cannot be read by the local page.
+    const apiHost = ["[::]", "[::1]", "::", "::1", "0.0.0.0"].includes(location.hostname)
+      ? "localhost"
+      : location.hostname;
+    return `${location.protocol}//${apiHost}:8000/api/v1`;
+  }
 
-  // The frontend may listen on IPv6 while Django's development server uses
-  // its default localhost address.
-  const apiHost = ["[::]", "[::1]", "::", "::1", "0.0.0.0"].includes(location.hostname)
-    ? "localhost"
-    : location.hostname;
-  return `${location.protocol}//${apiHost}:8000/api/v1`;
+  const configured = configuredValue?.trim().replace(/\/$/, "");
+  return configured || "/api/v1";
 }
 
 export function canonicalDevelopmentUrl(location) {
