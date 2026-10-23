@@ -720,6 +720,13 @@ button:disabled {
   background: var(--background);
 }
 
+.account-setup-view {
+  min-height: calc(100svh - 67px);
+  padding: clamp(24px, 6vw, 64px);
+  display: grid;
+  place-items: center;
+}
+
 .landing-main {
   width: 100%;
   overflow: hidden;

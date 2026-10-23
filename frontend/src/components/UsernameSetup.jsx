@@ -22,7 +22,7 @@ export default function UsernameSetup({ onComplete }) {
 
   return <>
     <div className="topbar"><div className="brand-group"><span className="index-tag">ACCOUNT SETUP</span><span className="brand-title">LIFELOG</span></div></div>
-    <main className="auth-view">
+    <main className="auth-view account-setup-view">
       <form className="auth-panel" onSubmit={submit} aria-busy={saving}>
         <p className="index-tag">ONE LAST STEP</p><h1>Choose a username</h1>
         <p className="form-copy">Pick the name you’ll use on LifeLog. You can use letters, numbers, and @/./+/-/_ characters.</p>
