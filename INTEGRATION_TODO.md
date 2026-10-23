@@ -11,7 +11,7 @@
 
 ## 2. Add a frontend API layer
 
-- [x] Move the inline JavaScript from `index.html` into `frontend/app.js`.
+- [x] Move the frontend into React components with a shared API client.
 - [x] Define one configurable API base URL for local and deployed environments.
 - [x] Add a shared `request()` helper with JSON parsing and consistent error handling.
 - [x] Send cookies with `credentials: "include"`.

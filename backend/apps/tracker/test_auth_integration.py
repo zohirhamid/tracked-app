@@ -1,8 +1,69 @@
 from django.contrib.auth import get_user_model
+from django.contrib.sites.models import Site
+from django.test import Client, override_settings
+from allauth.socialaccount.models import SocialApp
 from rest_framework.test import APITestCase
 
 
 class AllauthFrontendIntegrationTests(APITestCase):
+    @override_settings(
+        SOCIALACCOUNT_PROVIDERS={
+            "google": {
+                "SCOPE": ["profile", "email"],
+                "AUTH_PARAMS": {"access_type": "online"},
+                "OAUTH_PKCE_ENABLED": True,
+            }
+        }
+    )
+    def test_google_button_can_start_backend_redirect_flow(self):
+        site = Site.objects.get(pk=1)
+        google_app = SocialApp.objects.create(
+            provider="google",
+            name="Google",
+            client_id="test-client.apps.googleusercontent.com",
+            secret="test-secret",
+        )
+        google_app.sites.add(site)
+
+        client = Client(enforce_csrf_checks=True, HTTP_HOST="localhost")
+        config = client.get("/api/v1/_allauth/browser/v1/config")
+        self.assertEqual(config.status_code, 200)
+        google_provider = next(
+            provider
+            for provider in config.json()["data"]["socialaccount"]["providers"]
+            if provider["id"] == "google"
+        )
+        self.assertEqual(
+            google_provider["client_id"],
+            "test-client.apps.googleusercontent.com",
+        )
+        csrf_token = config.cookies["csrftoken"].value
+
+        response = client.post(
+            "/api/v1/_allauth/browser/v1/auth/provider/redirect",
+            {
+                "csrfmiddlewaretoken": csrf_token,
+                "provider": "google",
+                "process": "login",
+                "callback_url": "http://localhost:5173/?social=google",
+            },
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_REFERER="http://localhost:5173/",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("https://accounts.google.com/"))
+
+        failure = client.get(
+            "/accounts/google/login/callback/?error=access_denied",
+        )
+        self.assertEqual(failure.status_code, 302)
+        self.assertTrue(
+            failure["Location"].startswith("http://localhost:5173/?"),
+            failure["Location"],
+        )
+        self.assertIn("error=", failure["Location"])
+
     def test_frontend_origin_can_send_the_session_token_header(self):
         for origin in ("http://localhost:5173", "http://[::]:5173"):
             with self.subTest(origin=origin):

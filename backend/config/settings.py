@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from corsheaders.defaults import default_headers
 
 # ─────────────────────────────────────────────
@@ -29,6 +29,12 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set")
 
 DEBUG = env_bool("DJANGO_DEBUG")
+
+# Older local setups keep their Google credentials in backend/.env while the
+# application settings live in the repository-root .env. Read only those OAuth
+# values as a development fallback; do not import the second file's database or
+# secret-key settings.
+LOCAL_GOOGLE_ENV = dotenv_values(BASE_DIR / ".env") if DEBUG else {}
 
 # Hostnames Django may serve, protecting against forged Host headers.
 ALLOWED_HOSTS = [
@@ -57,7 +63,7 @@ TEMPLATES = [
     },
 ]
 
-# The static frontend runs on a separate origin during local development.
+# The Vite frontend runs on a separate origin during local development.
 # Session cookies and the allauth app-session header must both be accepted.
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
@@ -128,7 +134,18 @@ ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 # Lets users sign in immediately without first confirming their email address.
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_UNIQUE_EMAIL = True
-HEADLESS_ONLY = False
+HEADLESS_ONLY = True
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173" if DEBUG else "https://tracked.zohirhamid.com",
+).rstrip("/")
+
+# Any provider failure that occurs before Allauth can recover the callback URL
+# must return to the React app, never to Allauth's stock Django templates.
+HEADLESS_FRONTEND_URLS = {
+    "socialaccount_login_error": f"{FRONTEND_URL}/?social=google",
+}
 
 # ─────────────────────────────────────────────
 # MIDDLEWARE
@@ -148,29 +165,40 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
 ]
 
-# Google OAuth credentials belong in the environment, never in source control.
-# The client ID is also safe to expose through a public-config API when the
-# frontend initializes Google Identity Services; the client secret is not.
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+# Google OAuth credentials belong in the environment or an Allauth SocialApp,
+# never in source control. Allauth exposes the public client ID to the frontend
+# configuration endpoint while keeping the client secret server-side.
+GOOGLE_CLIENT_ID = (
+    os.getenv("GOOGLE_CLIENT_ID") or LOCAL_GOOGLE_ENV.get("GOOGLE_CLIENT_ID") or ""
+).strip()
+GOOGLE_CLIENT_SECRET = (
+    os.getenv("GOOGLE_CLIENT_SECRET")
+    or LOCAL_GOOGLE_ENV.get("GOOGLE_CLIENT_SECRET")
+    or ""
+).strip()
 
-SOCIALACCOUNT_PROVIDERS = {
-    "google": {
-        # Register the Google OAuth application directly from environment
-        # variables instead of requiring a SocialApp record in Django admin.
-        "APP": {
-            "client_id": GOOGLE_CLIENT_ID,
-            "secret": GOOGLE_CLIENT_SECRET,
-            "key": "",
-        },
-        # Request only the identity information required to create/sign in a
-        # TRACKED account.
-        "SCOPE": ["profile", "email"],
-        # A short-lived online token is sufficient; no offline refresh token
-        # is needed because Google is used only for authentication.
-        "AUTH_PARAMS": {"access_type": "online"},
-    }
+GOOGLE_PROVIDER_SETTINGS = {
+    # Request only the identity information required to create/sign in a
+    # TRACKED account.
+    "SCOPE": ["profile", "email"],
+    # A short-lived online token is sufficient; no offline refresh token is
+    # needed because Google is used only for authentication.
+    "AUTH_PARAMS": {"access_type": "online"},
+    "OAUTH_PKCE_ENABLED": True,
 }
+
+# Register environment credentials only when both are present. Otherwise, let
+# django-allauth use the Google SocialApp stored in the database. Never register
+# an empty APP block: it overrides a valid SocialApp and sends Google an empty
+# client_id. A deployment should use one credential source, not both.
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    GOOGLE_PROVIDER_SETTINGS["APP"] = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "secret": GOOGLE_CLIENT_SECRET,
+        "key": "",
+    }
+
+SOCIALACCOUNT_PROVIDERS = {"google": GOOGLE_PROVIDER_SETTINGS}
 
 # Google marks the returned email as verified. Allow that verified address to
 # sign in to an existing email/password account and attach the Google identity
@@ -223,8 +251,8 @@ else:
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Serve the dependency-free frontend from the same origin as the API.
-WHITENOISE_ROOT = BASE_DIR.parent / "frontend"
+# Serve the compiled React frontend from the same origin as the API.
+WHITENOISE_ROOT = BASE_DIR.parent / "frontend" / "dist"
 WHITENOISE_INDEX_FILE = True
 
 # ─────────────────────────────────────────────
