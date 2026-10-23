@@ -92,6 +92,6 @@ export default function App() {
 
   if (authState === "loading") return <div className="auth-view"><main className="landing-main"><section className="access-section"><div className="access-copy"><p className="landing-kicker"><span>01</span> LIFELOG</p><h2>Opening your log…</h2></div></section></main></div>;
   if (authState === "unauthenticated") return <LandingPage initialError={authError} onAuthenticated={enterAuthenticatedApp} />;
-  if (authState === "setup") return <UsernameSetup onComplete={enterAuthenticatedApp} />;
+  if (authState === "setup") return <UsernameSetup onComplete={enterAuthenticatedApp} onSignOut={signOut} />;
   return <Dashboard visibleMonth={visibleMonth} setVisibleMonth={setVisibleMonth} monthData={monthData} setMonthData={setMonthData} loading={monthLoading} status={status} loadMonth={loadMonth} onSignOut={signOut} />;
 }

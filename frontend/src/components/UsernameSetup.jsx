@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { request } from "../api.js";
 
-export default function UsernameSetup({ onComplete }) {
+export default function UsernameSetup({ onComplete, onSignOut }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -21,7 +21,10 @@ export default function UsernameSetup({ onComplete }) {
   }
 
   return <>
-    <div className="topbar"><div className="brand-group"><span className="index-tag">ACCOUNT SETUP</span><span className="brand-title">LIFELOG</span></div></div>
+    <div className="topbar">
+      <div className="brand-group"><span className="index-tag">ACCOUNT SETUP</span><span className="brand-title">LIFELOG</span></div>
+      <button className="secondary-button" type="button" onClick={onSignOut}>BACK TO LANDING</button>
+    </div>
     <main className="auth-view account-setup-view">
       <form className="auth-panel" onSubmit={submit} aria-busy={saving}>
         <p className="index-tag">ONE LAST STEP</p><h1>Choose a username</h1>
