@@ -41,10 +41,10 @@ npm run dev
 Open `http://localhost:5173`. The API is available at
 `http://localhost:8000/api/v1/`.
 
-The React frontend reads its API origin from the `api-base-url` meta tag in
-`frontend/index.html`. It points to the Railway backend for the separately
-deployed frontend. When the page itself is running on a local host, that value
-is intentionally ignored and the frontend calls the local API on port 8000.
+The React frontend reads its API base path from the `api-base-url` meta tag in
+`frontend/index.html`. In production, the frontend server proxies `/api` and
+`/accounts` to Django so authentication cookies remain first-party. When the
+page is running on a local host, the frontend calls the local API on port 8000.
 
 ## Deployment
 
@@ -75,12 +75,20 @@ Backend:  https://tracked-app-production-8314.up.railway.app
 ```
 
 Set `FRONTEND_URL=https://frontend-production-9e32.up.railway.app` on the
-backend Railway service. The frontend origin is included in Django's CORS and
-CSRF trusted-origin settings. In Google Cloud Console, register this exact
-authorized redirect URI (including the trailing slash):
+backend Railway service. Optionally set `BACKEND_URL` to the backend origin on
+the frontend Railway service; it defaults to the production backend above. The
+frontend origin is included in Django's CSRF trusted-origin settings. In Google
+Cloud Console, register the callback on the public frontend origin because the
+`/accounts` path is proxied to Django (including the trailing slash):
 
 ```text
-https://tracked-app-production-8314.up.railway.app/accounts/google/login/callback/
+https://frontend-production-9e32.up.railway.app/accounts/google/login/callback/
+```
+
+If the custom frontend domain is enabled, register its callback too:
+
+```text
+https://tracked.zohirhamid.com/accounts/google/login/callback/
 ```
 
 ## Main endpoints

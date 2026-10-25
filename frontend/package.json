@@ -8,12 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test lib.test.mjs",
-    "start": "serve -s dist -l $PORT"
+    "start": "node server.mjs"
   },
   "dependencies": {
     "react": "latest",
     "react-dom": "latest",
-    "serve": "^14.2.6"
+    "serve-handler": "6.1.7"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",

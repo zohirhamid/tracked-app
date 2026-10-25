@@ -11,6 +11,7 @@ import {
   formatEntry,
   updateMonthEntry,
 } from "./lib.mjs";
+import { isBackendPath } from "./server.mjs";
 
 test("resolves API URLs for local IPv4, IPv6, and deployed frontends", () => {
   assert.equal(
@@ -37,6 +38,20 @@ test("resolves API URLs for local IPv4, IPv6, and deployed frontends", () => {
     apiBaseUrl("https://api.example/v1/", { protocol: "https:", hostname: "tracked.example" }),
     "https://api.example/v1",
   );
+});
+
+test("uses the same-origin API path in production", () => {
+  assert.equal(
+    apiBaseUrl("/api/v1", new URL("https://tracked.zohirhamid.com/")),
+    "/api/v1",
+  );
+});
+
+test("proxies only API and OAuth account routes", () => {
+  assert.equal(isBackendPath("/api/v1/auth/csrf/?fresh=1"), true);
+  assert.equal(isBackendPath("/accounts/google/login/callback/"), true);
+  assert.equal(isBackendPath("/assets/index.js"), false);
+  assert.equal(isBackendPath("/api-documentation"), false);
 });
 
 test("canonicalizes development host aliases for OAuth origin matching", () => {
