@@ -170,6 +170,59 @@ class AllauthFrontendIntegrationTests(APITestCase):
         self.assertEqual(response.json()["username"], "google_user")
         self.assertTrue(response.json()["is_complete"])
 
+    def test_browser_session_rejects_missing_csrf_token(self):
+        user = get_user_model().objects.create_user(
+            username="csrf-missing",
+            email="csrf-missing@example.com",
+        )
+        client = Client(enforce_csrf_checks=True, HTTP_HOST="localhost")
+        client.force_login(user)
+
+        response = client.post(
+            "/api/v1/tracker/profile/username/",
+            data=json.dumps({"username": "csrf_missing"}),
+            content_type="application/json",
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_REFERER="http://localhost:5173/",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_browser_session_rejects_untrusted_origin(self):
+        user = get_user_model().objects.create_user(
+            username="csrf-origin",
+            email="csrf-origin@example.com",
+        )
+        client = Client(enforce_csrf_checks=True, HTTP_HOST="localhost")
+        client.force_login(user)
+        csrf = client.get(
+            "/api/v1/auth/csrf/",
+            HTTP_ORIGIN="http://localhost:5173",
+        )
+        csrf_token = csrf.json()["csrf_token"]
+
+        response = client.post(
+            "/api/v1/tracker/profile/username/",
+            data=json.dumps({"username": "csrf_origin"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+            HTTP_ORIGIN="https://attacker.example",
+            HTTP_REFERER="https://attacker.example/",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_csrf_token_response_is_not_cacheable(self):
+        response = self.client.get(
+            "/api/v1/auth/csrf/",
+            HTTP_ORIGIN="http://localhost:5173",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("csrftoken", response.cookies)
+        self.assertIn("no-cache", response["Cache-Control"])
+        self.assertIn("no-store", response["Cache-Control"])
+
     def test_username_must_be_unique_ignoring_case(self):
         current_user = get_user_model().objects.create_user(
             username="current-user",

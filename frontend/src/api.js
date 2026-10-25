@@ -2,6 +2,7 @@ import { apiBaseUrl } from "../lib.mjs";
 
 const apiMeta = document.querySelector('meta[name="api-base-url"]');
 const API_BASE_URL = apiBaseUrl(apiMeta?.content, window.location);
+const API_IS_SAME_ORIGIN = new URL(API_BASE_URL, window.location.href).origin === window.location.origin;
 const SESSION_TOKEN_KEY = "lifelog_session_token";
 let crossOriginCsrfToken = "";
 let csrfTokenRequest = null;
@@ -11,8 +12,11 @@ export function apiUrl(path) {
 }
 
 export function csrfToken() {
-  const cookie = document.cookie.split("; ").find((item) => item.startsWith("csrftoken="));
-  return cookie ? decodeURIComponent(cookie.split("=").slice(1).join("=")) : crossOriginCsrfToken;
+  if (API_IS_SAME_ORIGIN) {
+    const cookie = document.cookie.split("; ").find((item) => item.startsWith("csrftoken="));
+    if (cookie) return decodeURIComponent(cookie.split("=").slice(1).join("="));
+  }
+  return crossOriginCsrfToken;
 }
 
 export class ApiError extends Error {
