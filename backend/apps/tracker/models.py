@@ -1,7 +1,5 @@
 from django.db import models
 from django.conf import settings
-from decimal import Decimal
-from datetime import datetime
 
 
 class AccountSetup(models.Model):
@@ -31,6 +29,11 @@ class Tracker(models.Model):
         ('prayer', 'Islamic Prayer (5x)'),
     ]
     
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="trackers",
+    )
     name = models.CharField(max_length=100)
     tracker_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     unit = models.CharField(max_length=20, blank=True, null=True)
@@ -44,6 +47,9 @@ class Tracker(models.Model):
     
     class Meta:
         ordering = ['display_order', 'created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_active', 'display_order']),
+        ]
     
     def __str__(self):
         return self.name
@@ -54,10 +60,21 @@ class DailySnapshot(models.Model):
     Represents one day in the tracking sheet.
     its a container that groups all entries for a certain day.
     """
-    date = models.DateField(unique=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_snapshots",
+    )
+    date = models.DateField()
     
     class Meta:
         ordering = ['-date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'date'],
+                name='unique_snapshot_per_user_date',
+            ),
+        ]
     
     def __str__(self):
         return str(self.date)
@@ -68,6 +85,11 @@ class Entry(models.Model):
     The ACTUAL DATA. This is the value in a cell of your Excel sheet.
     """
     id:int
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tracker_entries",
+    )
     tracker = models.ForeignKey(Tracker, on_delete=models.CASCADE)
     daily_snapshot = models.ForeignKey(DailySnapshot, on_delete=models.CASCADE)
 
@@ -87,6 +109,7 @@ class Entry(models.Model):
         unique_together = ['tracker', 'daily_snapshot']
         indexes = [
             models.Index(fields=['daily_snapshot', 'tracker']),
+            models.Index(fields=['user', 'daily_snapshot']),
         ]
     
     def __str__(self):
@@ -130,86 +153,3 @@ class Entry(models.Model):
         self.text_value = None
         self.rating_value = None
         self.prayer_values = None
-
-    def set_value_from_data(self, data):
-        """
-        Set entry value based on tracker type and validate.
-        Raises ValueError if validation fails.
-        """
-        tracker = self.tracker
-        
-        if tracker.tracker_type == 'binary':
-            self.binary_value = data.get('binary_value')
-        
-        elif tracker.tracker_type == 'number':
-            self.number_value = Decimal(str(data.get('number_value')))
-        
-        elif tracker.tracker_type == 'time':
-            self.time_value = datetime.strptime(data.get('time_value'), '%H:%M').time()
-        
-        elif tracker.tracker_type == 'duration':
-            duration = data.get('duration_minutes')
-            self.duration_minutes = int(duration) if duration is not None else None
-        
-        elif tracker.tracker_type == 'text':
-            self.text_value = data.get('text_value', '')
-        
-        elif tracker.tracker_type == 'rating':
-            self._set_rating_value(data)
-
-        elif tracker.tracker_type == 'prayer':
-            self._set_prayer_values(data)
-    
-    def _set_rating_value(self, data):
-        """Set and validate rating value"""
-        rating_val = data.get('rating_value')
-        if rating_val is None:
-            return
-        
-        rating_int = int(rating_val)
-        
-        if self.tracker.min_value and rating_int < self.tracker.min_value:
-            raise ValueError(f'Rating must be at least {self.tracker.min_value}')
-        
-        if self.tracker.max_value and rating_int > self.tracker.max_value:
-            raise ValueError(f'Rating must be at most {self.tracker.max_value}')
-        
-        self.rating_value = rating_int
-
-    def _set_prayer_values(self, data):
-        """Set and validate prayer values"""
-        values = data.get('prayer_values')
-        if values is None:
-            self.prayer_values = None
-            return
-
-        if isinstance(values, str):
-            try:
-                import json
-                values = json.loads(values)
-            except Exception:
-                raise ValueError('Invalid prayer values')
-
-        if not isinstance(values, dict):
-            raise ValueError('Invalid prayer values')
-
-        prayer_keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
-        normalized = {}
-        for key in prayer_keys:
-            raw = values.get(key, None)
-            if raw is True or raw is False or raw is None:
-                normalized[key] = raw
-            elif isinstance(raw, str):
-                lowered = raw.lower()
-                if lowered == 'true':
-                    normalized[key] = True
-                elif lowered == 'false':
-                    normalized[key] = False
-                elif lowered in ['null', 'none', '']:
-                    normalized[key] = None
-                else:
-                    raise ValueError('Invalid prayer values')
-            else:
-                raise ValueError('Invalid prayer values')
-
-        self.prayer_values = normalized

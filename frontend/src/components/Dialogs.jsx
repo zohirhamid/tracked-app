@@ -3,6 +3,15 @@ import { request } from "../api.js";
 
 const trackerTypes = ["binary", "number", "time", "duration", "text", "rating", "prayer"];
 const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+const trackerTypeDetails = {
+  binary: { label: "Yes / No", glyph: "Y/N", description: "A simple completed or not completed check." },
+  number: { label: "Number", glyph: "123", description: "Any numeric value, with an optional unit." },
+  time: { label: "Time", glyph: "12:", description: "A specific time of day." },
+  duration: { label: "Duration", glyph: "MIN", description: "A length of time recorded in minutes." },
+  text: { label: "Notes", glyph: "TXT", description: "Short notes or journal-style entries." },
+  rating: { label: "Rating", glyph: "★", description: "A score within a range you choose." },
+  prayer: { label: "Prayer", glyph: "5×", description: "Track the five daily prayers together." },
+};
 
 function useModal(open, onClose) {
   const ref = useRef(null);
@@ -95,13 +104,17 @@ export function EntryDialog({ state, trackers, onClose, onSaved }) {
   </dialog>;
 }
 
-function TrackerRow({ tracker, onRefresh, onDelete, setError }) {
+function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
   const [values, setValues] = useState(tracker);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    setValues(tracker);
+  }, [tracker]);
+
   async function save(event) {
-    event?.preventDefault();
+    event.preventDefault();
     if (saving) return;
     setSaving(true);
     setSaved(false);
@@ -112,15 +125,15 @@ function TrackerRow({ tracker, onRefresh, onDelete, setError }) {
         body: JSON.stringify({
           name: values.name,
           tracker_type: values.tracker_type,
-          unit: values.unit || null,
+          unit: ["number", "duration"].includes(values.tracker_type) ? values.unit || null : null,
           display_order: Number(values.display_order) || 0,
           is_active: values.is_active,
-          min_value: values.min_value === "" || values.min_value == null ? null : Number(values.min_value),
-          max_value: values.max_value === "" || values.max_value == null ? null : Number(values.max_value),
+          min_value: values.tracker_type !== "rating" || values.min_value === "" || values.min_value == null ? null : Number(values.min_value),
+          max_value: values.tracker_type !== "rating" || values.max_value === "" || values.max_value == null ? null : Number(values.max_value),
         }),
       });
       setSaved(true);
-      await onRefresh(false);
+      await onSaved(tracker.id);
       window.setTimeout(() => setSaved(false), 1200);
     } catch (requestError) {
       setError(requestError.message);
@@ -130,16 +143,57 @@ function TrackerRow({ tracker, onRefresh, onDelete, setError }) {
   }
 
   const change = (field, value) => setValues((current) => ({ ...current, [field]: value }));
-  return <form className={`tracker-manager-row${saving ? " saving" : ""}${saved ? " saved" : ""}`} onSubmit={save}>
-    <input value={values.name} onChange={(event) => change("name", event.target.value)} onBlur={save} aria-label="Tracker name" />
-    <select value={values.tracker_type} onChange={(event) => { change("tracker_type", event.target.value); }} onBlur={save} aria-label="Tracker type">{trackerTypes.map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select>
-    <input value={values.unit || ""} onChange={(event) => change("unit", event.target.value)} onBlur={save} placeholder="Unit" aria-label="Unit" />
-    <input type="number" value={values.display_order} onChange={(event) => change("display_order", event.target.value)} onBlur={save} title="Display order" aria-label="Display order" />
-    <input type="number" value={values.min_value ?? ""} onChange={(event) => change("min_value", event.target.value)} onBlur={save} placeholder="Min" title="Rating minimum" aria-label="Rating minimum" />
-    <input type="number" value={values.max_value ?? ""} onChange={(event) => change("max_value", event.target.value)} onBlur={save} placeholder="Max" title="Rating maximum" aria-label="Rating maximum" />
-    <label className="active-toggle"><input type="checkbox" checked={values.is_active} onChange={(event) => change("is_active", event.target.checked)} onBlur={save} />ACTIVE</label>
-    <button className="secondary-button" type="submit" disabled={saving}>{saving ? "SAVING" : saved ? "SAVED" : "SAVE"}</button>
-    <button className="text-button destructive" type="button" onClick={() => onDelete(tracker)}>DELETE</button>
+  const details = trackerTypeDetails[values.tracker_type];
+  return <form className={`tracker-editor${saving ? " saving" : ""}`} onSubmit={save}>
+    <div className="tracker-editor-heading">
+      <div><p className="index-tag">EDIT TRACKER</p><h3>{tracker.name}</h3></div>
+      <span className={`tracker-state${values.is_active ? " active" : ""}`}>{values.is_active ? "Active" : "Paused"}</span>
+    </div>
+    <div className="tracker-field-grid">
+      <label className="tracker-name-field">Name<input value={values.name} onChange={(event) => change("name", event.target.value)} maxLength="100" required autoFocus /></label>
+      <label>Position<input type="number" min="0" value={values.display_order} onChange={(event) => change("display_order", event.target.value)} /></label>
+    </div>
+    <fieldset className="tracker-type-fieldset">
+      <legend>Format</legend>
+      <div className="tracker-type-grid">{trackerTypes.map((type) => <label className={`tracker-type-option${values.tracker_type === type ? " selected" : ""}`} key={type}>
+        <input type="radio" name="tracker_type" value={type} checked={values.tracker_type === type} onChange={() => change("tracker_type", type)} />
+        <span className="tracker-type-glyph">{trackerTypeDetails[type].glyph}</span><span>{trackerTypeDetails[type].label}</span>
+      </label>)}</div>
+      <p className="tracker-type-help">{details.description}</p>
+    </fieldset>
+    {(["number", "duration"].includes(values.tracker_type)) && <label>Unit <span className="field-hint">Optional</span><input value={values.unit || ""} onChange={(event) => change("unit", event.target.value)} maxLength="20" placeholder={values.tracker_type === "duration" ? "e.g. min" : "e.g. km, pages, glasses"} /></label>}
+    {values.tracker_type === "rating" && <div className="tracker-field-grid">
+      <label>Minimum<input type="number" value={values.min_value ?? ""} onChange={(event) => change("min_value", event.target.value)} placeholder="1" /></label>
+      <label>Maximum<input type="number" value={values.max_value ?? ""} onChange={(event) => change("max_value", event.target.value)} placeholder="5" /></label>
+    </div>}
+    <label className="tracker-visibility-toggle">
+      <span><strong>Show in tracker grid</strong><small>Paused trackers keep their history but disappear from the month view.</small></span>
+      <input type="checkbox" checked={values.is_active} onChange={(event) => change("is_active", event.target.checked)} />
+    </label>
+    <div className="tracker-editor-actions">
+      <button className="text-button destructive" type="button" onClick={() => onDelete(tracker)}>DELETE TRACKER</button>
+      <button className="log-entry-button" type="submit" disabled={saving}>{saving ? "SAVING…" : saved ? "SAVED ✓" : "SAVE CHANGES"}</button>
+    </div>
+  </form>;
+}
+
+function NewTrackerForm({ onCreate, onCancel, creating }) {
+  const [type, setType] = useState("binary");
+  const details = trackerTypeDetails[type];
+  return <form className="tracker-editor new-tracker-editor" onSubmit={onCreate}>
+    <div className="tracker-editor-heading"><div><p className="index-tag">NEW TRACKER</p><h3>What do you want to track?</h3></div></div>
+    <label>Name<input name="name" maxLength="100" placeholder="e.g. Read, Mood, Water" required autoFocus /></label>
+    <fieldset className="tracker-type-fieldset">
+      <legend>Format</legend>
+      <div className="tracker-type-grid">{trackerTypes.map((value) => <label className={`tracker-type-option${type === value ? " selected" : ""}`} key={value}>
+        <input type="radio" name="tracker_type" value={value} checked={type === value} onChange={() => setType(value)} />
+        <span className="tracker-type-glyph">{trackerTypeDetails[value].glyph}</span><span>{trackerTypeDetails[value].label}</span>
+      </label>)}</div>
+      <p className="tracker-type-help">{details.description}</p>
+    </fieldset>
+    {["number", "duration"].includes(type) && <label>Unit <span className="field-hint">Optional</span><input name="unit" maxLength="20" placeholder={type === "duration" ? "e.g. min" : "e.g. km, pages, glasses"} /></label>}
+    {type === "rating" && <div className="tracker-field-grid"><label>Minimum<input name="min_value" type="number" placeholder="1" /></label><label>Maximum<input name="max_value" type="number" placeholder="5" /></label></div>}
+    <div className="tracker-editor-actions"><button className="secondary-button" type="button" onClick={onCancel}>CANCEL</button><button className="log-entry-button" type="submit" disabled={creating}>{creating ? "ADDING…" : "ADD TRACKER"}</button></div>
   </form>;
 }
 
@@ -147,6 +201,9 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
   const [trackers, setTrackers] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [showNew, setShowNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const dialogRef = useModal(open, onClose);
 
@@ -154,7 +211,9 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
     setLoading(true);
     try {
       const data = await request("/tracker/trackers/");
-      setTrackers(Array.isArray(data) ? data : data.results || []);
+      const nextTrackers = Array.isArray(data) ? data : data.results || [];
+      setTrackers(nextTrackers);
+      setSelectedId((current) => nextTrackers.some((tracker) => tracker.id === current) ? current : nextTrackers[0]?.id ?? null);
       if (refreshMonth) await onMonthRefresh();
     } catch (requestError) {
       setError(requestError.message);
@@ -170,17 +229,21 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     setError("");
+    setCreating(true);
     try {
-      await request("/tracker/trackers/create/", { method: "POST", body: JSON.stringify({
+      const created = await request("/tracker/trackers/create/", { method: "POST", body: JSON.stringify({
         name: form.get("name"), tracker_type: form.get("tracker_type"), unit: form.get("unit") || null,
-        min_value: form.get("min_value") === "" ? null : Number(form.get("min_value")),
-        max_value: form.get("max_value") === "" ? null : Number(form.get("max_value")),
+        min_value: !form.get("min_value") ? null : Number(form.get("min_value")),
+        max_value: !form.get("max_value") ? null : Number(form.get("max_value")),
         display_order: trackers.length, is_active: true,
       }) });
-      formElement.reset();
       await load(true);
+      setSelectedId(created.id);
+      setShowNew(false);
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -195,23 +258,29 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
   }
 
   if (!open) return null;
+  const selectedTracker = trackers.find((tracker) => tracker.id === selectedId);
   return <>
-    <dialog className="app-dialog tracker-dialog" ref={dialogRef} onCancel={onClose}>
-      <div className="dialog-form">
-        <div className="dialog-heading"><div><p className="index-tag">SETTINGS</p><h2>Trackers</h2></div><button className="dialog-close" type="button" onClick={onClose} aria-label="Close">×</button></div>
-        <div className="tracker-list">
-          <div className="tracker-manager-head">{["NAME", "TYPE", "UNIT", "ORDER", "MIN", "MAX", "ACTIVE", "", ""].map((text, index) => <span key={`${text}-${index}`}>{text}</span>)}</div>
-          {trackers.map((tracker) => <TrackerRow key={tracker.id} tracker={tracker} onRefresh={async () => { await load(); await onMonthRefresh(); }} onDelete={setDeleteTarget} setError={setError} />)}
-          {loading && !trackers.length && <p className="app-status loading">Loading trackers…</p>}
+    <dialog className="app-dialog tracker-dialog" ref={dialogRef} onCancel={onClose} aria-labelledby="tracker-dialog-title">
+      <div className="tracker-dialog-shell">
+        <div className="tracker-dialog-heading"><div><p className="index-tag">SETTINGS</p><h2 id="tracker-dialog-title">Your trackers</h2><p>Choose what appears in your monthly grid.</p></div><button className="dialog-close" type="button" onClick={onClose} aria-label="Close">×</button></div>
+        <div className="tracker-manager-layout">
+          <aside className="tracker-sidebar">
+            <button className="add-tracker-button" type="button" onClick={() => setShowNew(true)}><span>+</span> NEW TRACKER</button>
+            <div className="tracker-list" role="listbox" aria-label="Trackers">
+              {trackers.map((tracker) => <button type="button" role="option" aria-selected={!showNew && tracker.id === selectedId} className={`tracker-list-item${!showNew && tracker.id === selectedId ? " selected" : ""}`} key={tracker.id} onClick={() => { setSelectedId(tracker.id); setShowNew(false); setError(""); }}>
+                <span className="tracker-list-glyph">{trackerTypeDetails[tracker.tracker_type]?.glyph}</span>
+                <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
+                {!tracker.is_active && <span className="tracker-paused-dot" title="Paused">○</span>}
+              </button>)}
+              {loading && !trackers.length && <p className="tracker-empty-state">Loading trackers…</p>}
+              {!loading && !trackers.length && <p className="tracker-empty-state">No trackers yet.<br />Add one to build your grid.</p>}
+            </div>
+          </aside>
+          <section className="tracker-detail-panel">
+            {showNew ? <NewTrackerForm onCreate={create} onCancel={() => setShowNew(false)} creating={creating} /> : selectedTracker ? <TrackerEditor key={selectedTracker.id} tracker={selectedTracker} onSaved={async (id) => { await load(); setSelectedId(id); await onMonthRefresh(); }} onDelete={setDeleteTarget} setError={setError} /> : <div className="tracker-detail-empty"><span>+</span><h3>Build your tracker grid</h3><p>Add a tracker to start logging what matters to you.</p><button className="log-entry-button" type="button" onClick={() => setShowNew(true)}>ADD YOUR FIRST TRACKER</button></div>}
+            {error && <p className="form-error tracker-dialog-error" role="alert">{error}</p>}
+          </section>
         </div>
-        <form className="new-tracker-form" onSubmit={create}>
-          <h3>Add tracker</h3>
-          <label>Name<input name="name" maxLength="100" required /></label>
-          <label>Type<select name="tracker_type">{trackerTypes.map((type) => <option key={type} value={type}>{type === "binary" ? "Yes / No" : type === "text" ? "Text / Notes" : type[0].toUpperCase() + type.slice(1)}</option>)}</select></label>
-          <label>Unit<input name="unit" maxLength="20" /></label><label>Rating min<input name="min_value" type="number" /></label><label>Rating max<input name="max_value" type="number" /></label>
-          <button className="log-entry-button" type="submit">ADD TRACKER</button>
-        </form>
-        <p className="form-error" role="alert">{error}</p>
       </div>
     </dialog>
     {deleteTarget && <ConfirmDelete tracker={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={remove} />}

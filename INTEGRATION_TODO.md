@@ -22,7 +22,7 @@
 - [x] Add signed-out, loading, and signed-in application states.
 - [x] Build email/password signup and sign-in using Allauth headless endpoints.
 - [x] Add sign-out.
-- [x] Require authentication for the tracker API (tracker data remains shared by the current schema).
+- [x] Require authentication and per-user ownership for all tracker data.
 
 ## 4. Render the monthly sheet from Django
 
@@ -74,7 +74,8 @@
 - [x] Test local frontend (`localhost:5173`) against local Django (`localhost:8000`).
 - [ ] Verify authentication and CORS in the deployed environment.
 - [x] Add frontend tests for formatting and monthly rendering.
-- [ ] Add an end-to-end test for sign-in, month loading, entry editing, and month navigation.
+- [x] Add an end-to-end test for signup/sign-in, account setup, tracker creation,
+  entry editing, month navigation, sign-out, and the Google provider handoff.
 - [x] Remove all frontend sample data and unused static rendering code.
 - [x] Update the README with commands for running both services together.
 

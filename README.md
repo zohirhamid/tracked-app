@@ -5,7 +5,7 @@ TRACKED is a Django REST API and React frontend for spreadsheet-style life track
 ## Features
 
 - Email/password authentication through Django Allauth
-- Authenticated API with shared trackers and entries
+- Authenticated API with private per-user trackers and entries
 - Trackers with configurable ordering and active state
 - Binary, number, time, duration, text, rating, and prayer tracker types
 - Monthly calendar data grouped into weeks
@@ -27,8 +27,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-The tracker data is shared between authenticated users; the current schema does
-not assign trackers or entries to individual accounts.
+Tracker data is private to each authenticated account.
 
 Start the frontend in another terminal:
 
@@ -40,6 +39,30 @@ npm run dev
 
 Open `http://localhost:5173`. The API is available at
 `http://localhost:8000/api/v1/`.
+
+Run the automated checks from their respective application directories:
+
+```bash
+cd backend && .venv/bin/python manage.py test
+cd ../frontend && npm test && npm run build
+```
+
+The browser journey uses an isolated temporary SQLite database and starts both
+local services automatically:
+
+```bash
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+```
+
+To smoke-test an already deployed staging environment, set `E2E_BASE_URL`.
+The suite creates a unique account and tracker, so do not point it at production
+unless disposable test accounts are acceptable:
+
+```bash
+E2E_BASE_URL=https://staging.example.com npm run test:e2e
+```
 
 The React frontend reads its API base path from the `api-base-url` meta tag in
 `frontend/index.html`. In production, the frontend server proxies `/api` and
@@ -66,6 +89,22 @@ gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000}
 
 The frontend is available at `/`; account setup is handled inside the React app.
 The deployment health check remains available at `/health/`.
+
+### Ownership migration backup gate
+
+Migration `0014_add_per_user_ownership` preserves existing shared tracker data
+under one account. Before deploying it to PostgreSQL:
+
+1. Create a database backup using Railway's backup facility or `pg_dump`.
+2. Restore that backup into a separate PostgreSQL database and confirm the
+   expected user, tracker, snapshot, and entry counts.
+3. Set `TRACKER_LEGACY_OWNER_EMAIL` to the account that should receive the
+   formerly shared records.
+4. Set `TRACKER_OWNERSHIP_BACKUP_VERIFIED=true` only after the restore check.
+
+The migration refuses to run on PostgreSQL when tracking data exists and the
+backup-verification flag is absent. After deployment, compare the record counts
+again and remove `TRACKER_OWNERSHIP_BACKUP_VERIFIED` from the service.
 
 For the separate Railway services, use these origins:
 

@@ -8,7 +8,8 @@ from .serializers import EntrySerializer
 class MonthDataBuilder:
     """Service for building month view data structure"""
     
-    def __init__(self, year, month):
+    def __init__(self, user, year, month):
+        self.user = user
         self.year = year
         self.month = month
         self._entries = None
@@ -17,6 +18,7 @@ class MonthDataBuilder:
         if self._entries is None:
             self._entries = list(
                 Entry.objects.filter(
+                    user=self.user,
                     daily_snapshot__date__year=self.year,
                     daily_snapshot__date__month=self.month,
                     tracker__in=trackers,

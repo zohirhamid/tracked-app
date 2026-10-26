@@ -1423,51 +1423,446 @@ textarea:focus {
 }
 
 .tracker-dialog {
-  width: min(1040px, calc(100% - 32px));
+  width: min(980px, calc(100% - 32px));
+  overflow: hidden;
 }
 
-.tracker-list {
+.tracker-dialog-shell {
+  min-height: min(720px, calc(100vh - 48px));
   display: grid;
-  gap: 8px;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 24px 80px oklch(17% 0 0 / .18);
 }
 
-.tracker-manager-head,
-.tracker-manager-row {
-  display: grid;
-  grid-template-columns: minmax(140px, 2fr) 1fr 1fr 62px 58px 58px auto auto auto;
+.tracker-dialog-heading {
+  min-height: 94px;
+  padding: 22px 24px;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
 }
 
-.tracker-manager-head {
-  padding: 0 2px;
+.tracker-dialog-heading h2 {
+  margin-top: 8px;
+  font-size: 20px;
+  letter-spacing: -.02em;
+}
+
+.tracker-dialog-heading p:last-child {
+  margin-top: 4px;
   color: var(--muted-foreground);
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 11px;
+}
+
+.tracker-manager-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.tracker-sidebar {
+  min-height: 0;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in oklch, var(--secondary), white 35%);
+}
+
+.add-tracker-button {
+  min-height: 42px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px dashed color-mix(in oklch, var(--foreground), transparent 55%);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font: 800 10px/1 var(--default-mono-font-family);
   letter-spacing: .06em;
 }
 
-.tracker-manager-row.saving {
-  opacity: .65;
+.add-tracker-button span {
+  font-size: 17px;
+  font-weight: 500;
 }
 
-.tracker-manager-row.saved {
-  box-shadow: inset 3px 0 var(--positive);
+.add-tracker-button:hover {
+  border-style: solid;
+  background: var(--card);
 }
 
-.new-tracker-form {
-  margin-top: 12px;
-  padding-top: 20px;
+.tracker-list {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+}
+
+.tracker-list-item {
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 10px;
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr .7fr .7fr auto;
-  align-items: end;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tracker-list-item:hover {
+  background: color-mix(in oklch, var(--card), transparent 15%);
+}
+
+.tracker-list-item.selected {
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: 0 2px 8px oklch(17% 0 0 / .05);
+}
+
+.tracker-list-glyph {
+  width: 38px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--foreground);
+  color: var(--card);
+  font: 800 9px/1 var(--default-mono-font-family);
+  letter-spacing: -.02em;
+}
+
+.tracker-list-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.tracker-list-copy strong,
+.tracker-list-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-list-copy strong {
+  font-size: 11px;
+}
+
+.tracker-list-copy small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.tracker-paused-dot {
+  color: var(--muted-foreground);
+  font-size: 18px;
+}
+
+.tracker-empty-state {
+  padding: 34px 12px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.tracker-detail-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.tracker-editor {
+  min-height: 100%;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tracker-editor.saving {
+  pointer-events: none;
+}
+
+.tracker-editor-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tracker-editor-heading h3 {
+  margin-top: 8px;
+  font-size: 18px;
+  letter-spacing: -.01em;
+}
+
+.tracker-state {
+  padding: 5px 8px;
+  border-radius: 99px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.tracker-state.active {
+  background: var(--positive-bg);
+  color: color-mix(in oklch, var(--positive), black 20%);
+}
+
+.tracker-editor > label,
+.tracker-field-grid label,
+.tracker-type-fieldset legend {
+  display: grid;
+  gap: 7px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.field-hint {
+  margin-left: 5px;
+  font-weight: 500;
+  opacity: .75;
+}
+
+.tracker-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px;
+  gap: 12px;
+}
+
+.tracker-type-fieldset {
+  min-width: 0;
+}
+
+.tracker-type-fieldset legend {
+  margin-bottom: 8px;
+}
+
+.tracker-type-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.tracker-type-option {
+  min-width: 0;
+  min-height: 64px;
+  padding: 9px 6px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tracker-type-option:hover {
+  border-color: color-mix(in oklch, var(--foreground), transparent 55%);
+  color: var(--foreground);
+}
+
+.tracker-type-option.selected {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--card);
+  box-shadow: 0 0 0 1px var(--foreground);
+}
+
+.tracker-type-option input {
+  position: absolute;
+  width: 1px;
+  min-height: 1px;
+  opacity: 0;
+}
+
+.tracker-type-glyph {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.tracker-type-help {
+  min-height: 18px;
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.tracker-visibility-toggle {
+  padding: 13px 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--secondary);
+  cursor: pointer;
+}
+
+.tracker-visibility-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.tracker-visibility-toggle strong {
+  color: var(--foreground);
+  font-size: 11px;
+}
+
+.tracker-visibility-toggle small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tracker-visibility-toggle input {
+  width: 36px;
+  min-height: 20px;
+  accent-color: var(--foreground);
+}
+
+.tracker-editor-actions {
+  margin-top: auto;
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   border-top: 1px solid var(--border);
 }
 
-.new-tracker-form h3 {
-  grid-column: 1 / -1;
-  font-size: 13px;
+.new-tracker-editor .tracker-editor-actions {
+  justify-content: flex-end;
+}
+
+.tracker-dialog-error {
+  position: sticky;
+  right: 20px;
+  bottom: 14px;
+  left: 20px;
+  min-height: 0;
+  margin: 0 20px 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 60%);
+  border-radius: 4px;
+  background: var(--negative-bg);
+}
+
+.tracker-detail-empty {
+  min-height: 100%;
+  padding: 40px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.tracker-detail-empty > span {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--input);
+  border-radius: 50%;
+  font-size: 24px;
+}
+
+.tracker-detail-empty p {
+  max-width: 320px;
+  margin-bottom: 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.tracker-detail-empty h3 {
+  font-size: 15px;
+}
+
+@media (max-width: 760px) {
+  .tracker-dialog {
+    width: min(680px, calc(100% - 20px));
+    max-height: calc(100vh - 20px);
+  }
+
+  .tracker-dialog-shell {
+    min-height: calc(100vh - 20px);
+  }
+
+  .tracker-dialog-heading {
+    min-height: 82px;
+    padding: 17px 18px;
+  }
+
+  .tracker-manager-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .tracker-sidebar {
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tracker-list {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .tracker-list-item {
+    width: 180px;
+    min-width: 180px;
+    min-height: 42px;
+    padding: 5px 7px;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+  }
+
+  .tracker-list-glyph {
+    width: 30px;
+    height: 30px;
+  }
+
+  .tracker-editor {
+    padding: 22px 20px;
+  }
 }
 
 @media (max-width: 1120px) {
@@ -1692,5 +2087,46 @@ textarea:focus {
 
   .prayer-inputs {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .tracker-dialog-heading p:last-child {
+    display: none;
+  }
+
+  .tracker-sidebar {
+    grid-template-columns: 125px minmax(0, 1fr);
+  }
+
+  .add-tracker-button {
+    padding: 0 8px;
+    font-size: 9px;
+  }
+
+  .tracker-list-item {
+    width: 152px;
+    min-width: 152px;
+  }
+
+  .tracker-editor {
+    padding: 18px 16px;
+    gap: 18px;
+  }
+
+  .tracker-type-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tracker-field-grid {
+    grid-template-columns: minmax(0, 1fr) 84px;
+  }
+
+  .tracker-editor-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .tracker-editor-actions .log-entry-button,
+  .tracker-editor-actions .secondary-button {
+    min-height: 40px;
   }
 }
