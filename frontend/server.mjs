@@ -1,6 +1,6 @@
 import http from "node:http";
-import https from "node:https";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import serveHandler from "serve-handler";
@@ -21,36 +21,45 @@ export function isBackendPath(requestPath = "") {
     || pathname === "/accounts" || pathname.startsWith("/accounts/");
 }
 
-function proxyToBackend(request, response) {
-  const transport = backendUrl.protocol === "https:" ? https : http;
-  const headers = { ...request.headers };
+async function proxyToBackend(request, response) {
+  try {
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (value !== undefined && !["connection", "content-length", "host", "transfer-encoding"].includes(name)) {
+        headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+      }
+    }
 
-  // Keep the public frontend Host header so Allauth generates OAuth callback
-  // URLs on this same origin. The TLS connection still targets BACKEND_URL.
-  headers.host = request.headers.host;
+    // Fetch connects using BACKEND_URL while Django uses the public frontend
+    // host when constructing OAuth callback URLs.
+    headers.set("x-forwarded-host", request.headers.host || "");
+    headers.set("x-forwarded-proto", request.headers["x-forwarded-proto"] || "https");
 
-  const upstream = transport.request({
-    protocol: backendUrl.protocol,
-    hostname: backendUrl.hostname,
-    port: backendUrl.port || undefined,
-    method: request.method,
-    path: request.url,
-    headers,
-    servername: backendUrl.hostname,
-  }, (upstreamResponse) => {
-    response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
-    upstreamResponse.pipe(response);
-  });
+    const hasBody = !["GET", "HEAD"].includes(request.method || "GET");
+    const bodyChunks = [];
+    if (hasBody) {
+      for await (const chunk of request) bodyChunks.push(chunk);
+    }
+    const upstreamResponse = await fetch(new URL(request.url, backendUrl), {
+      method: request.method,
+      headers,
+      body: hasBody ? Buffer.concat(bodyChunks) : undefined,
+      redirect: "manual",
+    });
+    const responseHeaders = Object.fromEntries(upstreamResponse.headers);
+    const setCookies = upstreamResponse.headers.getSetCookie?.() || [];
+    if (setCookies.length) responseHeaders["set-cookie"] = setCookies;
 
-  upstream.on("error", (error) => {
+    response.writeHead(upstreamResponse.status, responseHeaders);
+    if (upstreamResponse.body) Readable.fromWeb(upstreamResponse.body).pipe(response);
+    else response.end();
+  } catch (error) {
     console.error("Backend proxy request failed:", error.message);
     if (!response.headersSent) {
       response.writeHead(502, { "Content-Type": "application/json" });
     }
     response.end(JSON.stringify({ error: "Backend is unavailable" }));
-  });
-
-  request.pipe(upstream);
+  }
 }
 
 const server = http.createServer((request, response) => {
