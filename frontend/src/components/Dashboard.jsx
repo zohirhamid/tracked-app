@@ -40,9 +40,18 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
   const inputRef = useRef(null);
   const finished = useRef(false);
 
+  function focusEditor() {
+    const input = inputRef.current;
+    if (!input) return;
+    const tableWrap = input.closest(".tracker-table-wrap");
+    const scrollLeft = tableWrap?.scrollLeft;
+    input.focus({ preventScroll: true });
+    if (["text", "number"].includes(input.type)) input.select();
+    if (tableWrap && scrollLeft != null) tableWrap.scrollLeft = scrollLeft;
+  }
+
   useEffect(() => {
-    inputRef.current?.focus();
-    if (["text", "number"].includes(inputRef.current?.type)) inputRef.current.select();
+    focusEditor();
   }, []);
 
   async function commit(nextValue = value) {
@@ -55,7 +64,7 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
     } catch (requestError) {
       setSaving(false);
       onError(requestError.message);
-      inputRef.current?.focus();
+      focusEditor();
     }
   }
 
