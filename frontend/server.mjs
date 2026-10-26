@@ -1,6 +1,5 @@
 import http from "node:http";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import serveHandler from "serve-handler";
@@ -49,13 +48,13 @@ async function proxyToBackend(request, response) {
     });
     const responseHeaders = Object.fromEntries(upstreamResponse.headers);
     const setCookies = upstreamResponse.headers.getSetCookie?.() || [];
+    const responseBody = Buffer.from(await upstreamResponse.arrayBuffer());
     delete responseHeaders["content-encoding"];
-    delete responseHeaders["content-length"];
+    responseHeaders["content-length"] = String(responseBody.length);
     if (setCookies.length) responseHeaders["set-cookie"] = setCookies;
 
     response.writeHead(upstreamResponse.status, responseHeaders);
-    if (upstreamResponse.body) Readable.fromWeb(upstreamResponse.body).pipe(response);
-    else response.end();
+    response.end(responseBody);
   } catch (error) {
     console.error("Backend proxy request failed:", error.message);
     if (!response.headersSent) {
