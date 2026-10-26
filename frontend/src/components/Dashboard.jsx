@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { dateParts, entryTone, flattenDays, formatEntry } from "../../lib.mjs";
+import { dateParts, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, summarizeTrackers } from "../../lib.mjs";
 import { request } from "../api.js";
 import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
 
@@ -16,6 +16,10 @@ function valuePayload(tracker, date, value) {
     payload.delete_entry = true;
     return payload;
   }
+  if (tracker.tracker_type === "duration") {
+    payload.duration_minutes = durationMinutesFromHours(value);
+    return payload;
+  }
   const field = { binary: "binary_value", number: "number_value", time: "time_value", duration: "duration_minutes", text: "text_value", rating: "rating_value" }[tracker.tracker_type];
   payload[field] = tracker.tracker_type === "binary" ? value === "true" : value;
   return payload;
@@ -24,7 +28,7 @@ function valuePayload(tracker, date, value) {
 function initialValue(tracker, entry) {
   if (tracker.tracker_type === "binary") return entry?.binary_value == null ? "" : String(entry.binary_value);
   if (tracker.tracker_type === "number") return entry?.number_value ?? "";
-  if (tracker.tracker_type === "duration") return entry?.duration_minutes ?? "";
+  if (tracker.tracker_type === "duration") return durationHoursFromMinutes(entry?.duration_minutes);
   if (tracker.tracker_type === "rating") return entry?.rating_value ?? "";
   if (tracker.tracker_type === "time") return entry?.time_value?.slice(0, 5) || "";
   return entry?.text_value || "";
@@ -72,8 +76,8 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
     ref={inputRef} className="inline-editor" type={type} value={value} disabled={saving}
     min={tracker.tracker_type === "duration" ? 0 : tracker.tracker_type === "rating" ? tracker.min_value ?? undefined : undefined}
     max={tracker.tracker_type === "rating" ? tracker.max_value ?? undefined : undefined}
-    step={tracker.tracker_type === "number" ? "any" : ["duration", "rating"].includes(tracker.tracker_type) ? 1 : undefined}
-    placeholder={tracker.tracker_type === "duration" ? "Minutes" : undefined}
+    step={["number", "duration"].includes(tracker.tracker_type) ? "any" : tracker.tracker_type === "rating" ? 1 : undefined}
+    placeholder={tracker.tracker_type === "duration" ? "Hours" : undefined}
     onChange={(event) => setValue(event.target.value)} onKeyDown={keyDown} onBlur={() => commit()}
   />;
 }
@@ -94,9 +98,8 @@ function TrackerCell({ day, tracker, entry, activeCell, setActiveCell, onSaved, 
   >{value}</td>;
 }
 
-function MonthTable({ data, loading, activeCell, setActiveCell, onSaved, onError }) {
+function TrackerTable({ data, days, loading, activeCell, setActiveCell, onSaved, onError }) {
   const trackers = data?.trackers || [];
-  const days = flattenDays(data?.weeks);
   const width = Math.max(110 + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 104), 0), 600);
   return <div className="tracker-table-wrap">
     <table className={`tracker-table${loading ? " is-loading" : ""}`} style={{ width }}>
@@ -105,7 +108,7 @@ function MonthTable({ data, loading, activeCell, setActiveCell, onSaved, onError
       <tbody>{days.map((day) => {
         const rowDate = dateParts(day.date);
         const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(rowDate).toUpperCase();
-        return <tr key={day.date} className={day.date === data.today ? "today-row" : ""}>
+        return <tr key={day.date} className={`${day.date === data.today ? "today-row" : ""}${day.outside_month ? " outside-month" : ""}`}>
           <th scope="row" aria-current={day.date === data.today ? "date" : undefined}>{weekday}  {String(day.day).padStart(2, "0")}</th>
           {trackers.map((tracker) => <TrackerCell key={tracker.id} day={day} tracker={tracker} entry={day.entries?.[tracker.id] || day.entries?.[String(tracker.id)] || null} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={onSaved} onError={onError} />)}
         </tr>;
@@ -114,12 +117,13 @@ function MonthTable({ data, loading, activeCell, setActiveCell, onSaved, onError
   </div>;
 }
 
-function Summary({ data }) {
+function Summary({ data, days, viewMode }) {
   const trackers = new Map((data?.trackers || []).map((tracker) => [tracker.id, tracker]));
-  const trackedDates = flattenDays(data?.weeks).filter((day) => Object.keys(day.entries || {}).length).length;
+  const trackedDates = days.filter((day) => Object.keys(day.entries || {}).length).length;
+  const summaries = viewMode === "week" ? summarizeTrackers(data?.trackers, days) : data?.summaries || [];
   return <section className="summary-section" aria-labelledby="summary-heading">
-    <div className="summary-title-row"><h2 id="summary-heading">Monthly averages</h2><span className="index-tag">{trackedDates}/{data?.total_days || 0} DAYS TRACKED</span></div>
-    <div className="summary-grid">{(data?.summaries || []).map((summary) => {
+    <div className="summary-title-row"><h2 id="summary-heading">{viewMode === "week" ? "Weekly" : "Monthly"} averages</h2><span className="index-tag">{trackedDates}/{viewMode === "week" ? days.length : data?.total_days || 0} DAYS TRACKED</span></div>
+    <div className="summary-grid">{summaries.map((summary) => {
       const tracker = trackers.get(summary.tracker_id);
       return tracker ? <article className="summary-card" key={summary.tracker_id}><p className="stat-label">{tracker.name}</p><p className="stat-value">{summary.display}</p><p className="summary-count">{summary.count} {summary.count === 1 ? "entry" : "entries"}</p></article> : null;
     })}</div>
@@ -131,9 +135,38 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   const [trackerDialog, setTrackerDialog] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
   const [localStatus, setLocalStatus] = useState("");
+  const [viewMode, setViewMode] = useState("month");
+  const [weekIndex, setWeekIndex] = useState(0);
   const today = new Date();
   const monthText = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(visibleMonth);
   const monthValue = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}`;
+  const weeks = monthData?.weeks || [];
+  const monthDays = flattenDays(weeks).filter((day) => !day.outside_month);
+  const loadedMonthKey = monthDays[0]?.date.slice(0, 7);
+  const activeWeek = weeks[Math.min(weekIndex, Math.max(weeks.length - 1, 0))] || [];
+  const visibleDays = viewMode === "week" ? activeWeek : monthDays;
+
+  useEffect(() => {
+    if (!monthData?.weeks?.length) return;
+    const todayIndex = monthData.weeks.findIndex((week) => week.some((day) => day.date === monthData.today));
+    setWeekIndex(todayIndex >= 0 ? todayIndex : 0);
+    setActiveCell(null);
+  }, [loadedMonthKey]);
+
+  const weekText = (() => {
+    if (!activeWeek.length) return monthText;
+    const start = dateParts(activeWeek[0].date);
+    const end = dateParts(activeWeek[activeWeek.length - 1].date);
+    const startText = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(start);
+    const endText = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(end);
+    return `${startText} – ${endText}`;
+  })();
+
+  function selectMonth(monthNumber) {
+    if (monthNumber === visibleMonth.getMonth() + 1) return;
+    setActiveCell(null);
+    setVisibleMonth(new Date(visibleMonth.getFullYear(), monthNumber - 1, 1));
+  }
 
   function openNewEntry() {
     if (!monthData?.trackers.length) { setTrackerDialog(true); return; }
@@ -147,11 +180,14 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
       const next = structuredClone(current);
       const day = flattenDays(next.weeks).find((candidate) => candidate.date === date);
       if (!day) return current;
+      day.entries ||= {};
       if (result.entry) day.entries[trackerId] = result.entry;
       else delete day.entries[trackerId];
-      const summaryIndex = next.summaries.findIndex((item) => item.tracker_id === trackerId);
-      if (result.summary && summaryIndex === -1) next.summaries.push(result.summary);
-      else if (result.summary) next.summaries[summaryIndex] = result.summary;
+      if (date.startsWith(monthValue)) {
+        const summaryIndex = next.summaries.findIndex((item) => item.tracker_id === trackerId);
+        if (result.summary && summaryIndex === -1) next.summaries.push(result.summary);
+        else if (result.summary) next.summaries[summaryIndex] = result.summary;
+      }
       return next;
     });
     setLocalStatus("");
@@ -164,14 +200,31 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
       <div className="topbar-actions"><button className="secondary-button" type="button" onClick={() => setTrackerDialog(true)}>TRACKERS</button><button className="log-entry-button" type="button" onClick={openNewEntry}>+ LOG ENTRY</button><button className="secondary-button" type="button" onClick={onSignOut}>SIGN OUT</button></div>
     </div>
     <main id="app"><div className="dashboard-content"><section className="month-section" aria-labelledby="month-section-label">
-      <div className="month-toolbar"><h1 id="month-section-label"><time dateTime={monthValue}>{monthText}</time></h1><div className="month-controls" aria-label="Choose month">
-        <button className="month-arrow" id="previous-month" type="button" aria-label="Previous month" disabled={loading} onClick={() => setVisibleMonth(monthData ? new Date(monthData.prev_year, monthData.prev_month - 1, 1) : new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))}>‹</button>
-        <button className="today-button" type="button" onClick={() => setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1))}>Current</button>
-        <button className="month-arrow" id="next-month" type="button" aria-label="Next month" disabled={loading} onClick={() => setVisibleMonth(monthData ? new Date(monthData.next_year, monthData.next_month - 1, 1) : new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))}>›</button>
-      </div></div>
+      <div className="month-toolbar"><div className="period-heading"><h1 id="month-section-label"><time dateTime={viewMode === "week" ? activeWeek[0]?.date : monthValue}>{viewMode === "week" ? weekText : monthText}</time></h1><div className="view-switch" role="group" aria-label="Calendar view"><button type="button" className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => setViewMode("month")}>MONTH</button><button type="button" className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")}>WEEK</button></div></div></div>
       <p className={`app-status${displayStatus ? ` ${localStatus ? "error" : status.type}` : ""}`} role="status" aria-live="polite">{displayStatus}</p>
-      <MonthTable data={monthData} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={applyInlineSave} onError={setLocalStatus} />
-      <Summary data={monthData} />
+      <TrackerTable data={monthData} days={visibleDays} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={applyInlineSave} onError={setLocalStatus} />
+      <nav className="month-tab-strip" aria-label={`Months in ${visibleMonth.getFullYear()}`}>
+        <div className="month-tab-rail">
+          <span className="month-tab-year" aria-hidden="true">{visibleMonth.getFullYear()}</span>
+          <div className="month-tabs" role="tablist" aria-label="Choose month">
+            {(monthData?.months || []).map((month) => {
+              const selected = month.number === visibleMonth.getMonth() + 1;
+              const current = visibleMonth.getFullYear() === today.getFullYear() && month.number === today.getMonth() + 1;
+              return <button
+                key={month.number}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-current={current ? "date" : undefined}
+                className={`${selected ? "active" : ""}${current ? `${selected ? " " : ""}current-month` : ""}`}
+                disabled={loading}
+                onClick={() => selectMonth(month.number)}
+              >{month.name.toUpperCase()}</button>;
+            })}
+          </div>
+        </div>
+      </nav>
+      <Summary data={monthData} days={visibleDays} viewMode={viewMode} />
     </section></div></main>
     <EntryDialog state={entryDialog} trackers={monthData?.trackers || []} onClose={() => setEntryDialog(null)} onSaved={loadMonth} />
     <TrackerDialog open={trackerDialog} onClose={() => setTrackerDialog(false)} onMonthRefresh={loadMonth} />

@@ -2,6 +2,66 @@ export function flattenDays(weeks) {
   return (weeks || []).flatMap((week) => week || []);
 }
 
+export function durationHoursFromMinutes(minutes) {
+  if (minutes == null || minutes === "") return "";
+  return Number((Number(minutes) / 60).toFixed(2));
+}
+
+export function durationMinutesFromHours(hours) {
+  if (hours == null || hours === "") return "";
+  return Math.round(Number(hours) * 60);
+}
+
+export function formatDurationHours(minutes) {
+  const hours = durationHoursFromMinutes(minutes);
+  if (hours === "") return "";
+  return `${new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 }).format(hours)}h`;
+}
+
+export function summarizeTrackers(trackers, days) {
+  return (trackers || []).map((tracker) => {
+    const entries = (days || [])
+      .map((day) => day.entries?.[tracker.id] || day.entries?.[String(tracker.id)])
+      .filter(Boolean);
+    const summary = { tracker_id: tracker.id, count: entries.length, display: "—" };
+    let values = [];
+
+    if (tracker.tracker_type === "binary") {
+      values = entries.map((entry) => entry.binary_value).filter((value) => value != null);
+      if (values.length) summary.display = `${Math.round(values.filter(Boolean).length / values.length * 100)}%`;
+    } else if (tracker.tracker_type === "number") {
+      values = entries.map((entry) => Number(entry.number_value)).filter(Number.isFinite);
+      if (values.length) summary.display = `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)}${tracker.unit ? ` ${tracker.unit}` : ""}`;
+    } else if (tracker.tracker_type === "duration") {
+      values = entries.map((entry) => entry.duration_minutes).filter((value) => value != null);
+      if (values.length) {
+        const average = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+        summary.display = formatDurationHours(average);
+      }
+    } else if (tracker.tracker_type === "rating") {
+      values = entries.map((entry) => entry.rating_value).filter((value) => value != null);
+      if (values.length) summary.display = `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1)}${tracker.max_value ? `/${tracker.max_value}` : ""}`;
+    } else if (tracker.tracker_type === "time") {
+      values = entries.map((entry) => entry.time_value).filter(Boolean).map((value) => {
+        const [hours, minutes] = value.split(":").map(Number);
+        return hours * 60 + minutes;
+      });
+      if (values.length) {
+        const average = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) % (24 * 60);
+        summary.display = `${String(Math.floor(average / 60)).padStart(2, "0")}:${String(average % 60).padStart(2, "0")}`;
+      }
+    } else if (tracker.tracker_type === "prayer") {
+      values = entries.flatMap((entry) => Object.values(entry.prayer_values || {})).filter((value) => value != null);
+      if (values.length) summary.display = `${Math.round(values.filter(Boolean).length / values.length * 100)}%`;
+    } else if (tracker.tracker_type === "text") {
+      values = entries.map((entry) => entry.text_value).filter(Boolean);
+      summary.display = `${values.length} ${values.length === 1 ? "note" : "notes"}`;
+    }
+
+    return summary;
+  });
+}
+
 export function updateMonthEntry(monthData, date, trackerId, entry, summary) {
   const day = flattenDays(monthData?.weeks).find((candidate) => candidate.date === date);
   if (!day) return false;
@@ -81,10 +141,7 @@ export function formatEntry(entry, tracker) {
     case "time":
       return entry.time_value ? entry.time_value.slice(0, 5) : "";
     case "duration": {
-      if (entry.duration_minutes === null) return "";
-      const hours = Math.floor(entry.duration_minutes / 60);
-      const minutes = entry.duration_minutes % 60;
-      return hours ? `${hours}h${minutes ? ` ${minutes}m` : ""}` : `${minutes}m`;
+      return formatDurationHours(entry.duration_minutes);
     }
     case "text":
       return entry.text_value || "";

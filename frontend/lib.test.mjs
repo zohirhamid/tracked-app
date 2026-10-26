@@ -5,10 +5,13 @@ import {
   apiBaseUrl,
   canonicalDevelopmentUrl,
   dateParts,
+  durationHoursFromMinutes,
+  durationMinutesFromHours,
   entryTone,
   findSocialProvider,
   flattenDays,
   formatEntry,
+  summarizeTrackers,
   updateMonthEntry,
 } from "./lib.mjs";
 import { isBackendPath } from "./server.mjs";
@@ -115,7 +118,7 @@ test("formats every tracker value type", () => {
   assert.equal(formatEntry({ binary_value: true }, { tracker_type: "binary" }), "YES");
   assert.equal(formatEntry({ number_value: "1234.50" }, { tracker_type: "number", unit: "steps" }), "1,234.5 steps");
   assert.equal(formatEntry({ time_value: "07:30:00" }, { tracker_type: "time" }), "07:30");
-  assert.equal(formatEntry({ duration_minutes: 95 }, { tracker_type: "duration" }), "1h 35m");
+  assert.equal(formatEntry({ duration_minutes: 450 }, { tracker_type: "duration" }), "7.5h");
   assert.equal(formatEntry({ text_value: "Focused" }, { tracker_type: "text" }), "Focused");
   assert.equal(formatEntry({ rating_value: 4 }, { tracker_type: "rating", max_value: 5 }), "4/5");
   assert.equal(
@@ -125,6 +128,29 @@ test("formats every tracker value type", () => {
     ),
     "3/4",
   );
+});
+
+test("converts decimal duration hours to minute storage and back", () => {
+  assert.equal(durationMinutesFromHours("9.2"), 552);
+  assert.equal(durationHoursFromMinutes(552), 9.2);
+  assert.equal(durationMinutesFromHours("7.5"), 450);
+  assert.equal(durationHoursFromMinutes(450), 7.5);
+});
+
+test("builds summaries for only the visible week", () => {
+  const trackers = [
+    { id: 1, tracker_type: "rating", max_value: 5 },
+    { id: 2, tracker_type: "text" },
+  ];
+  const days = [
+    { entries: { 1: { rating_value: 3 }, 2: { text_value: "Focused" } } },
+    { entries: { 1: { rating_value: 5 } } },
+  ];
+
+  assert.deepEqual(summarizeTrackers(trackers, days), [
+    { tracker_id: 1, count: 2, display: "4.0/5" },
+    { tracker_id: 2, count: 1, display: "1 note" },
+  ]);
 });
 
 test("assigns semantic tones to binary, rating, and prayer entries", () => {

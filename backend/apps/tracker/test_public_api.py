@@ -35,6 +35,10 @@ class AuthenticatedTrackerApiTests(APITestCase):
         month = self.client.get("/api/v1/tracker/month/2026/10/")
         self.assertEqual(month.status_code, 200)
         self.assertEqual(len(month.json()["trackers"]), 1)
+        self.assertTrue(all(len(week) == 7 for week in month.json()["weeks"]))
+        self.assertEqual(month.json()["weeks"][0][0]["date"], "2026-09-28")
+        self.assertTrue(month.json()["weeks"][0][0]["outside_month"])
+        self.assertEqual(month.json()["weeks"][-1][-1]["date"], "2026-11-01")
 
     def test_entry_save_returns_updated_entry_and_monthly_summary(self):
         user = get_user_model().objects.create_user(
@@ -178,6 +182,8 @@ class AuthenticatedTrackerApiTests(APITestCase):
         entry = Entry.objects.get(pk=entry_response.json()["entry_id"])
         self.assertEqual(entry.user, user)
         self.assertEqual(entry.daily_snapshot.user, user)
+        self.assertEqual(entry.get_duration_display(), "8h")
+        self.assertEqual(entry_response.json()["summary"]["display"], "8h")
 
     def test_malformed_and_missing_typed_values_return_400(self):
         user = get_user_model().objects.create_user(

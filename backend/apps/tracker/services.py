@@ -1,6 +1,6 @@
 # tracker/services.py
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import calendar
 from .models import Entry
 from .serializers import EntrySerializer
@@ -34,21 +34,35 @@ class MonthDataBuilder:
             list: List of weeks, where each week is a list of day data
         """
         weeks = []
+        first_day = datetime(self.year, self.month, 1).date()
+        last_day = datetime(
+            self.year,
+            self.month,
+            calendar.monthrange(self.year, self.month)[1],
+        ).date()
+        calendar_start = first_day - timedelta(days=first_day.weekday())
+        calendar_end = last_day + timedelta(days=6 - last_day.weekday())
         entries_by_date = defaultdict(dict)
 
-        for entry in self._get_entries(trackers):
+        entries = Entry.objects.filter(
+            user=self.user,
+            daily_snapshot__date__range=(calendar_start, calendar_end),
+            tracker__in=trackers,
+        ).select_related('tracker', 'daily_snapshot')
+        for entry in entries:
             entries_by_date[entry.daily_snapshot.date][entry.tracker_id] = EntrySerializer(entry).data
-        
+
         current_week = []
-        num_days = calendar.monthrange(self.year, self.month)[1]
-        for day in range(1, num_days + 1):
-            date_obj = datetime(self.year, self.month, day).date()
+        date_obj = calendar_start
+        while date_obj <= calendar_end:
             day_data = self._build_day_data(date_obj, entries_by_date)
+            day_data['outside_month'] = date_obj.month != self.month
             current_week.append(day_data)
-            
-            if date_obj.weekday() == 6 or day == num_days:
+
+            if date_obj.weekday() == 6:
                 weeks.append(current_week)
                 current_week = []
+            date_obj += timedelta(days=1)
 
         return weeks
     
@@ -101,10 +115,10 @@ class MonthDataBuilder:
             elif tracker.tracker_type == 'duration':
                 values = [entry.duration_minutes for entry in entries if entry.duration_minutes is not None]
                 if values:
-                    average = round(sum(values) / len(values))
-                    hours, minutes = divmod(average, 60)
-                    display = f'{hours}h {minutes}m' if hours else f'{minutes}m'
-                    summary.update(value=average, display=display)
+                    average_minutes = round(sum(values) / len(values))
+                    average_hours = round(average_minutes / 60, 2)
+                    display_hours = f'{average_hours:.2f}'.rstrip('0').rstrip('.')
+                    summary.update(value=average_hours, display=f'{display_hours}h')
             elif tracker.tracker_type == 'rating':
                 values = [entry.rating_value for entry in entries if entry.rating_value is not None]
                 if values:

@@ -43,9 +43,13 @@ test("complete email account and tracking journey", async ({ page }) => {
   await expect(page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 5/5$`) })).toBeVisible();
 
   const currentMonth = (await page.getByRole("heading", { level: 1 }).textContent()).trim();
-  await page.getByRole("button", { name: "Previous month" }).click();
+  const currentMonthIndex = new Date().getMonth();
+  const alternativeMonthIndex = (currentMonthIndex + 11) % 12;
+  const alternativeMonth = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, alternativeMonthIndex, 1)).toUpperCase();
+  const currentMonthTab = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, currentMonthIndex, 1)).toUpperCase();
+  await page.getByRole("tab", { name: alternativeMonth }).click();
   await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(currentMonth);
-  await page.getByRole("button", { name: "Next month" }).click();
+  await page.getByRole("tab", { name: currentMonthTab }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(currentMonth);
 
   await page.getByRole("button", { name: "SIGN OUT" }).click();

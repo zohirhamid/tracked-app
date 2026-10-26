@@ -116,19 +116,11 @@ class Entry(models.Model):
         return f"{self.tracker.name} - {self.daily_snapshot.date}"
 
     def get_duration_display(self):
-        """Format duration as '4h 30min' or '5h' or '45min'"""
+        """Format the stored minute value as decimal hours."""
         if self.duration_minutes is None:
             return ""
-
-        hours = self.duration_minutes // 60
-        minutes = self.duration_minutes % 60
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}h {minutes}min"
-        elif hours > 0:
-            return f"{hours}h"
-        else:
-            return f"{minutes}min"
+        hours = round(self.duration_minutes / 60, 2)
+        return f"{hours:g}h"
     
     def get_rating_display(self):
         """Format rating with context from tracker
