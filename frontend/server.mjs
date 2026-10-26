@@ -34,6 +34,7 @@ async function proxyToBackend(request, response) {
     // host when constructing OAuth callback URLs.
     headers.set("x-forwarded-host", request.headers.host || "");
     headers.set("x-forwarded-proto", request.headers["x-forwarded-proto"] || "https");
+    headers.set("accept-encoding", "identity");
 
     const hasBody = !["GET", "HEAD"].includes(request.method || "GET");
     const bodyChunks = [];
@@ -48,6 +49,8 @@ async function proxyToBackend(request, response) {
     });
     const responseHeaders = Object.fromEntries(upstreamResponse.headers);
     const setCookies = upstreamResponse.headers.getSetCookie?.() || [];
+    delete responseHeaders["content-encoding"];
+    delete responseHeaders["content-length"];
     if (setCookies.length) responseHeaders["set-cookie"] = setCookies;
 
     response.writeHead(upstreamResponse.status, responseHeaders);
