@@ -31,7 +31,7 @@ async function proxyToBackend(request, response) {
 
     // Fetch connects using BACKEND_URL while Django uses the public frontend
     // host when constructing OAuth callback URLs.
-    headers.set("x-forwarded-host", request.headers.host || "");
+    headers.set("x-tracked-public-host", request.headers.host || "");
     headers.set("x-forwarded-proto", request.headers["x-forwarded-proto"] || "https");
     headers.set("accept-encoding", "identity");
 

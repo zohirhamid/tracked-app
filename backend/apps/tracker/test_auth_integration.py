@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
@@ -61,10 +62,16 @@ class AllauthFrontendIntegrationTests(APITestCase):
             },
             HTTP_ORIGIN="http://localhost:5173",
             HTTP_REFERER="http://localhost:5173/",
+            HTTP_X_TRACKED_PUBLIC_HOST="localhost:5173",
         )
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response["Location"].startswith("https://accounts.google.com/"))
+        redirect_uri = parse_qs(urlparse(response["Location"]).query)["redirect_uri"][0]
+        self.assertEqual(
+            redirect_uri,
+            "http://localhost:5173/accounts/google/login/callback/",
+        )
 
         failure = client.get(
             "/accounts/google/login/callback/?error=access_denied",

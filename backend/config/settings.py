@@ -74,6 +74,14 @@ CSRF_TRUSTED_ORIGINS = [
     "https://tracked.zohirhamid.com",
     "https://frontend-production-9e32.up.railway.app",
 ]
+FRONTEND_PROXY_HOSTS = {
+    "localhost:5173",
+    "127.0.0.1:5173",
+    "[::]:5173",
+    "[::1]:5173",
+    "tracked.zohirhamid.com",
+    "frontend-production-9e32.up.railway.app",
+}
 
 COOKIE_SECURE = env_bool("COOKIE_SECURE", default=not DEBUG)
 CSRF_COOKIE_SECURE = COOKIE_SECURE
@@ -160,6 +168,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "config.middleware.FrontendProxyHostMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -275,7 +284,6 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-USE_X_FORWARDED_HOST = True
 
 # ─────────────────────────────────────────────
 # LOGGING
