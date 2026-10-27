@@ -344,7 +344,20 @@ button:disabled {
 
 .tracker-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  height: min(70vh, 720px);
+  height: min(70dvh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tracker-table-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.tracker-table-wrap.week-view {
+  height: auto;
 }
 
 .month-tab-strip {
@@ -436,7 +449,8 @@ button:disabled {
 
 .tracker-table {
   width: 1232px;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
   background: var(--card);
   font-family: var(--default-mono-font-family);
@@ -444,6 +458,12 @@ button:disabled {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
+}
+
+.tracker-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
 }
 
 .tracker-table.is-loading {
@@ -470,9 +490,7 @@ button:disabled {
 }
 
 .tracker-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  position: relative;
   height: 36px;
   background: var(--secondary);
   color: var(--foreground);
@@ -489,8 +507,9 @@ button:disabled {
 }
 
 .tracker-table thead th:first-child {
+  position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 5;
 }
 
 .tracker-table tbody th,

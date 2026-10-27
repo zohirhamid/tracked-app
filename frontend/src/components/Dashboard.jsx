@@ -107,10 +107,10 @@ function TrackerCell({ day, tracker, entry, activeCell, setActiveCell, onSaved, 
   >{value}</td>;
 }
 
-function TrackerTable({ data, days, loading, activeCell, setActiveCell, onSaved, onError }) {
+function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell, onSaved, onError }) {
   const trackers = data?.trackers || [];
   const width = Math.max(110 + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 104), 0), 600);
-  return <div className="tracker-table-wrap">
+  return <div className={`tracker-table-wrap${viewMode === "week" ? " week-view" : ""}`} tabIndex="0" aria-label="Tracker sheet: scroll vertically through dates and horizontally through trackers">
     <table className={`tracker-table${loading ? " is-loading" : ""}`} style={{ width }}>
       <colgroup><col className="col-date" style={{ width: 110 }} />{trackers.map((tracker) => <col key={tracker.id} data-type={tracker.tracker_type} style={{ width: columnWidths[tracker.tracker_type] || 104 }} />)}</colgroup>
       <thead><tr><th scope="col">DATE</th>{trackers.map((tracker) => <th key={tracker.id} scope="col" title={`${tracker.name} · ${tracker.tracker_type}`}>{tracker.name}</th>)}</tr></thead>
@@ -144,7 +144,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   const [trackerDialog, setTrackerDialog] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
   const [localStatus, setLocalStatus] = useState("");
-  const [viewMode, setViewMode] = useState("month");
+  const [viewMode, setViewMode] = useState("week");
   const [weekIndex, setWeekIndex] = useState(0);
   const today = new Date();
   const monthText = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(visibleMonth);
@@ -209,10 +209,10 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
       <div className="topbar-actions"><button className="secondary-button" type="button" onClick={() => setTrackerDialog(true)}>TRACKERS</button><button className="log-entry-button" type="button" onClick={openNewEntry}>+ LOG ENTRY</button><button className="secondary-button" type="button" onClick={onSignOut}>SIGN OUT</button></div>
     </div>
     <main id="app"><div className="dashboard-content"><section className="month-section" aria-labelledby="month-section-label">
-      <div className="month-toolbar"><div className="period-heading"><h1 id="month-section-label"><time dateTime={viewMode === "week" ? activeWeek[0]?.date : monthValue}>{viewMode === "week" ? weekText : monthText}</time></h1><div className="view-switch" role="group" aria-label="Calendar view"><button type="button" className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => setViewMode("month")}>MONTH</button><button type="button" className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")}>WEEK</button></div></div></div>
+      <div className="month-toolbar"><div className="period-heading"><h1 id="month-section-label"><time dateTime={viewMode === "week" ? activeWeek[0]?.date : monthValue}>{viewMode === "week" ? weekText : monthText}</time></h1><div className="view-switch" role="group" aria-label="Calendar view"><button type="button" className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")}>WEEK</button><button type="button" className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => setViewMode("month")}>MONTH</button></div></div></div>
       <p className={`app-status${displayStatus ? ` ${localStatus ? "error" : status.type}` : ""}`} role="status" aria-live="polite">{displayStatus}</p>
-      <TrackerTable data={monthData} days={visibleDays} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={applyInlineSave} onError={setLocalStatus} />
-      <nav className="month-tab-strip" aria-label={`Months in ${visibleMonth.getFullYear()}`}>
+      <TrackerTable data={monthData} days={visibleDays} viewMode={viewMode} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={applyInlineSave} onError={setLocalStatus} />
+      {viewMode === "month" && <nav className="month-tab-strip" aria-label={`Months in ${visibleMonth.getFullYear()}`}>
         <div className="month-tab-rail">
           <span className="month-tab-year" aria-hidden="true">{visibleMonth.getFullYear()}</span>
           <div className="month-tabs" role="tablist" aria-label="Choose month">
@@ -232,7 +232,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
             })}
           </div>
         </div>
-      </nav>
+      </nav>}
       <Summary data={monthData} days={visibleDays} viewMode={viewMode} />
     </section></div></main>
     <EntryDialog state={entryDialog} trackers={monthData?.trackers || []} onClose={() => setEntryDialog(null)} onSaved={loadMonth} />
