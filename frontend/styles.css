@@ -344,8 +344,8 @@ button:disabled {
 
 .tracker-table-wrap {
   width: 100%;
-  height: min(70vh, 720px);
-  height: min(70dvh, 720px);
+  height: min(82vh, 710px);
+  height: min(82dvh, 710px);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
@@ -477,11 +477,11 @@ button:disabled {
   to { opacity: .62; }
 }
 
-.tracker-table .col-date { width: 110px; }
+.tracker-table .col-date { width: 86px; }
 
 .tracker-table th,
 .tracker-table td {
-  padding: 0 12px;
+  padding: 0 8px;
   border-width: 0 1px 1px 0;
   border-style: solid;
   border-color: color-mix(in oklch, var(--border), transparent 35%);
@@ -491,11 +491,11 @@ button:disabled {
 
 .tracker-table thead th {
   position: relative;
-  height: 36px;
+  height: 26px;
   background: var(--secondary);
   color: var(--foreground);
   font-family: var(--default-mono-font-family);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: .06em;
   line-height: 1;
@@ -514,7 +514,7 @@ button:disabled {
 
 .tracker-table tbody th,
 .tracker-table tbody td {
-  height: 30px;
+  height: 22px;
 }
 
 .tracker-table tbody tr {
@@ -541,6 +541,7 @@ button:disabled {
   z-index: 2;
   background: var(--row-background);
   color: var(--card-foreground);
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -555,7 +556,14 @@ button:disabled {
 
 .tracker-table td {
   color: var(--card-foreground);
+  font-size: 10px;
   white-space: nowrap;
+}
+
+.tracker-table td.past-empty {
+  color: color-mix(in oklch, var(--foreground), transparent 78%);
+  font-size: 5px;
+  text-align: center;
 }
 
 .tracker-table td.editing {
@@ -1814,6 +1822,50 @@ textarea:focus {
   margin-top: 8px;
   color: var(--muted-foreground);
   font-size: 10px;
+}
+
+.color-rule-fixed {
+  min-height: 0;
+  margin-top: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--secondary);
+}
+
+.tracker-color-rule {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--secondary);
+}
+
+.tracker-color-rule legend,
+.tracker-color-rule label {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.tracker-color-rule legend { padding: 0 5px; }
+
+.tracker-color-rule > p {
+  margin: 2px 0 12px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.tracker-color-rule-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, .65fr);
+  gap: 12px;
+}
+
+.tracker-color-rule-fields label {
+  display: grid;
+  gap: 7px;
 }
 
 .tracker-visibility-toggle {

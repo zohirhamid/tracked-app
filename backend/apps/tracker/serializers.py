@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from django.contrib.auth import get_user_model
+from datetime import datetime
 from .models import Tracker, Entry
 
 
@@ -27,9 +28,56 @@ class TrackerSerializer(serializers.ModelSerializer):
         model = Tracker
         fields = [
             'id', 'name', 'tracker_type', 'unit',
-            'display_order', 'is_active', 'min_value', 'max_value', 'created_at'
+            'display_order', 'is_active', 'min_value', 'max_value',
+            'color_rule', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        tracker_type = attrs.get(
+            'tracker_type',
+            self.instance.tracker_type if self.instance else None,
+        )
+        if 'color_rule' not in attrs:
+            return attrs
+        rule = attrs['color_rule']
+        if not rule or tracker_type == 'binary':
+            attrs['color_rule'] = {}
+            return attrs
+        if not isinstance(rule, dict):
+            raise serializers.ValidationError({'color_rule': 'Use a colour rule object.'})
+        operator = rule.get('operator')
+        value = rule.get('value')
+        operators = {
+            'number': {'gte', 'lte'}, 'duration': {'gte', 'lte'},
+            'rating': {'gte', 'lte'}, 'time': {'gte', 'lte'},
+            'text': {'contains', 'equals'}, 'prayer': {'gte'},
+        }
+        if operator not in operators.get(tracker_type, set()):
+            raise serializers.ValidationError({'color_rule': 'Choose a valid rule for this tracker type.'})
+        if tracker_type in {'number', 'duration', 'rating'}:
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({'color_rule': 'Enter a numeric target.'})
+        elif tracker_type == 'time':
+            try:
+                value = datetime.strptime(str(value), '%H:%M').strftime('%H:%M')
+            except ValueError:
+                raise serializers.ValidationError({'color_rule': 'Enter a valid time.'})
+        elif tracker_type == 'text':
+            value = str(value or '').strip()
+            if not value:
+                raise serializers.ValidationError({'color_rule': 'Enter text to match.'})
+        elif tracker_type == 'prayer':
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({'color_rule': 'Enter a prayer target from 1 to 5.'})
+            if value < 1 or value > 5:
+                raise serializers.ValidationError({'color_rule': 'Enter a prayer target from 1 to 5.'})
+        attrs['color_rule'] = {'operator': operator, 'value': value}
+        return attrs
 
 class EntrySerializer(serializers.ModelSerializer):
     class Meta:

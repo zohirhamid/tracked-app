@@ -40,6 +40,33 @@ class AuthenticatedTrackerApiTests(APITestCase):
         self.assertTrue(month.json()["weeks"][0][0]["outside_month"])
         self.assertEqual(month.json()["weeks"][-1][-1]["date"], "2026-11-01")
 
+    def test_tracker_color_rules_are_saved_and_validated_by_type(self):
+        user = get_user_model().objects.create_user(
+            username="colour-rule-user",
+            email="colour-rule@example.com",
+            password="correct horse battery staple",
+        )
+        self.client.force_authenticate(user=user)
+        created = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {"name": "Sleep", "tracker_type": "duration", "color_rule": {"operator": "gte", "value": 7.5}},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(created.json()["color_rule"], {"operator": "gte", "value": 7.5})
+        invalid = self.client.patch(
+            f"/api/v1/tracker/trackers/{created.json()['id']}/",
+            {"color_rule": {"operator": "contains", "value": "eight"}},
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, 400)
+        prayer = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {"name": "Salah", "tracker_type": "prayer", "color_rule": {"operator": "gte", "value": 6}},
+            format="json",
+        )
+        self.assertEqual(prayer.status_code, 400)
+
     def test_entry_save_returns_updated_entry_and_monthly_summary(self):
         user = get_user_model().objects.create_user(
             username="entry-user",

@@ -44,6 +44,11 @@ class Tracker(models.Model):
     # Rating-specific fields
     min_value = models.IntegerField(null=True, blank=True, help_text="Minimum rating value (e.g., 1)")
     max_value = models.IntegerField(null=True, blank=True, help_text="Maximum rating value (e.g., 5 or 10)")
+    color_rule = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Optional rule used to colour good and bad entries in the grid",
+    )
     
     class Meta:
         ordering = ['display_order', 'created_at']

@@ -14,6 +14,32 @@ const trackerTypeDetails = {
   prayer: { label: "Prayer", glyph: "5×", description: "Track the five daily prayers together." },
 };
 
+const colorRuleOptions = {
+  number: [["gte", "At least"], ["lte", "At most"]],
+  duration: [["gte", "At least"], ["lte", "At most"]],
+  rating: [["gte", "At least"], ["lte", "At most"]],
+  time: [["gte", "At or after"], ["lte", "At or before"]],
+  text: [["contains", "Contains"], ["equals", "Exactly matches"]],
+  prayer: [["gte", "At least"]],
+};
+
+function ColorRuleFields({ type, rule, onChange }) {
+  if (type === "binary") return <p className="tracker-type-help color-rule-fixed">Cell colours: YES is good and NO is bad.</p>;
+  const options = colorRuleOptions[type] || [];
+  const operator = rule?.operator || "";
+  const inputType = type === "time" ? "time" : ["number", "duration", "rating", "prayer"].includes(type) ? "number" : "text";
+  const placeholder = type === "duration" ? "e.g. 8 hours" : type === "prayer" ? "1–5" : type === "text" ? "Text to match" : "Target";
+  const setOperator = (nextOperator) => onChange(nextOperator ? { operator: nextOperator, value: type === "prayer" ? 5 : type === "time" ? "22:00" : "" } : {});
+  return <fieldset className="tracker-color-rule">
+    <legend>Cell colours <span className="field-hint">Optional</span></legend>
+    <p>Choose what should count as good. Other logged values will be marked bad.</p>
+    <div className="tracker-color-rule-fields">
+      <label>Good when<select value={operator} onChange={(event) => setOperator(event.target.value)}><option value="">No custom rule</option>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      {operator && <label>{type === "duration" ? "Hours" : type === "prayer" ? "Prayers" : "Target"}<input type={inputType} min={type === "duration" ? 0 : type === "prayer" ? 1 : undefined} max={type === "prayer" ? 5 : undefined} step={["number", "duration"].includes(type) ? "any" : undefined} value={rule?.value ?? ""} placeholder={placeholder} onChange={(event) => onChange({ operator, value: event.target.value })} required /></label>}
+    </div>
+  </fieldset>;
+}
+
 function useModal(open, onClose) {
   const ref = useRef(null);
   useEffect(() => {
@@ -132,6 +158,7 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
           is_active: values.is_active,
           min_value: values.tracker_type !== "rating" || values.min_value === "" || values.min_value == null ? null : Number(values.min_value),
           max_value: values.tracker_type !== "rating" || values.max_value === "" || values.max_value == null ? null : Number(values.max_value),
+          color_rule: values.tracker_type === "binary" ? {} : values.color_rule || {},
         }),
       });
       setSaved(true);
@@ -168,6 +195,7 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
       <label>Minimum<input type="number" value={values.min_value ?? ""} onChange={(event) => change("min_value", event.target.value)} placeholder="1" /></label>
       <label>Maximum<input type="number" value={values.max_value ?? ""} onChange={(event) => change("max_value", event.target.value)} placeholder="5" /></label>
     </div>}
+    <ColorRuleFields type={values.tracker_type} rule={values.color_rule} onChange={(rule) => change("color_rule", rule)} />
     <label className="tracker-visibility-toggle">
       <span><strong>Show in tracker grid</strong><small>Paused trackers keep their history but disappear from the month view.</small></span>
       <input type="checkbox" checked={values.is_active} onChange={(event) => change("is_active", event.target.checked)} />
@@ -181,6 +209,7 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
 
 function NewTrackerForm({ onCreate, onCancel, creating }) {
   const [type, setType] = useState("binary");
+  const [colorRule, setColorRule] = useState({});
   const details = trackerTypeDetails[type];
   return <form className="tracker-editor new-tracker-editor" onSubmit={onCreate}>
     <div className="tracker-editor-heading"><div><p className="index-tag">NEW TRACKER</p><h3>What do you want to track?</h3></div></div>
@@ -188,13 +217,15 @@ function NewTrackerForm({ onCreate, onCancel, creating }) {
     <fieldset className="tracker-type-fieldset">
       <legend>Format</legend>
       <div className="tracker-type-grid">{trackerTypes.map((value) => <label className={`tracker-type-option${type === value ? " selected" : ""}`} key={value}>
-        <input type="radio" name="tracker_type" value={value} checked={type === value} onChange={() => setType(value)} />
+        <input type="radio" name="tracker_type" value={value} checked={type === value} onChange={() => { setType(value); setColorRule({}); }} />
         <span className="tracker-type-glyph">{trackerTypeDetails[value].glyph}</span><span>{trackerTypeDetails[value].label}</span>
       </label>)}</div>
       <p className="tracker-type-help">{details.description}</p>
     </fieldset>
     {type === "number" && <label>Unit <span className="field-hint">Optional</span><input name="unit" maxLength="20" placeholder="e.g. km, pages, glasses" /></label>}
     {type === "rating" && <div className="tracker-field-grid"><label>Minimum<input name="min_value" type="number" placeholder="1" /></label><label>Maximum<input name="max_value" type="number" placeholder="5" /></label></div>}
+    <ColorRuleFields type={type} rule={colorRule} onChange={setColorRule} />
+    <input type="hidden" name="color_rule" value={JSON.stringify(colorRule)} />
     <div className="tracker-editor-actions"><button className="secondary-button" type="button" onClick={onCancel}>CANCEL</button><button className="log-entry-button" type="submit" disabled={creating}>{creating ? "ADDING…" : "ADD TRACKER"}</button></div>
   </form>;
 }
@@ -237,6 +268,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
         name: form.get("name"), tracker_type: form.get("tracker_type"), unit: form.get("tracker_type") === "duration" ? "h" : form.get("unit") || null,
         min_value: !form.get("min_value") ? null : Number(form.get("min_value")),
         max_value: !form.get("max_value") ? null : Number(form.get("max_value")),
+        color_rule: JSON.parse(form.get("color_rule") || "{}"),
         display_order: trackers.length, is_active: true,
       }) });
       await load(true);

@@ -4,7 +4,8 @@ import { request } from "../api.js";
 import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
 
 const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
-const columnWidths = { binary: 88, number: 104, time: 104, duration: 92, rating: 84, prayer: 112, text: 320 };
+const dateColumnWidth = 86;
+const columnWidths = { binary: 66, number: 78, time: 78, duration: 76, rating: 66, prayer: 84, text: 220 };
 
 function valuePayload(tracker, date, value) {
   const payload = { tracker_id: tracker.id, date };
@@ -91,9 +92,10 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
   />;
 }
 
-function TrackerCell({ day, tracker, entry, activeCell, setActiveCell, onSaved, onError }) {
+function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, onSaved, onError }) {
   const editing = activeCell === `${day.date}:${tracker.id}`;
   const value = formatEntry(entry, tracker);
+  const isPastEmpty = !entry && day.date < today;
   if (editing) return <td className="editing" data-type={tracker.tracker_type}>
     <InlineEditor tracker={tracker} entry={entry} date={day.date} onCancel={() => setActiveCell(null)} onSave={(result) => { setActiveCell(null); onSaved(day.date, tracker.id, result); }} onError={onError} />
   </td>;
@@ -101,25 +103,25 @@ function TrackerCell({ day, tracker, entry, activeCell, setActiveCell, onSaved, 
   const tone = entryTone(entry, tracker);
   return <td
     tabIndex="0" data-date={day.date} data-tracker-id={tracker.id} data-type={tracker.tracker_type}
-    className={`${tone}${tracker.tracker_type === "text" ? `${tone ? " " : ""}note` : ""}`}
+    className={`${tone}${tracker.tracker_type === "text" ? `${tone ? " " : ""}note` : ""}${isPastEmpty ? `${tone || tracker.tracker_type === "text" ? " " : ""}past-empty` : ""}`}
     aria-label={`${tracker.name}, ${day.date}${value ? `: ${value}` : ", empty"}`}
     onClick={open} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } }}
-  >{value}</td>;
+  >{isPastEmpty ? "—" : value}</td>;
 }
 
 function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell, onSaved, onError }) {
   const trackers = data?.trackers || [];
-  const width = Math.max(110 + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 104), 0), 600);
+  const width = Math.max(dateColumnWidth + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 78), 0), 520);
   return <div className={`tracker-table-wrap${viewMode === "week" ? " week-view" : ""}`} tabIndex="0" aria-label="Tracker sheet: scroll vertically through dates and horizontally through trackers">
     <table className={`tracker-table${loading ? " is-loading" : ""}`} style={{ width }}>
-      <colgroup><col className="col-date" style={{ width: 110 }} />{trackers.map((tracker) => <col key={tracker.id} data-type={tracker.tracker_type} style={{ width: columnWidths[tracker.tracker_type] || 104 }} />)}</colgroup>
+      <colgroup><col className="col-date" style={{ width: dateColumnWidth }} />{trackers.map((tracker) => <col key={tracker.id} data-type={tracker.tracker_type} style={{ width: columnWidths[tracker.tracker_type] || 78 }} />)}</colgroup>
       <thead><tr><th scope="col">DATE</th>{trackers.map((tracker) => <th key={tracker.id} scope="col" title={`${tracker.name} · ${tracker.tracker_type}`}>{tracker.name}</th>)}</tr></thead>
       <tbody>{days.map((day) => {
         const rowDate = dateParts(day.date);
         const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(rowDate).toUpperCase();
         return <tr key={day.date} className={`${day.date === data.today ? "today-row" : ""}${day.outside_month ? " outside-month" : ""}`}>
           <th scope="row" aria-current={day.date === data.today ? "date" : undefined}>{weekday}  {String(day.day).padStart(2, "0")}</th>
-          {trackers.map((tracker) => <TrackerCell key={tracker.id} day={day} tracker={tracker} entry={day.entries?.[tracker.id] || day.entries?.[String(tracker.id)] || null} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={onSaved} onError={onError} />)}
+          {trackers.map((tracker) => <TrackerCell key={tracker.id} day={day} today={data.today} tracker={tracker} entry={day.entries?.[tracker.id] || day.entries?.[String(tracker.id)] || null} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={onSaved} onError={onError} />)}
         </tr>;
       })}</tbody>
     </table>

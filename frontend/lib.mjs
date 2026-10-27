@@ -162,6 +162,25 @@ export function formatEntry(entry, tracker) {
 export function entryTone(entry, tracker) {
   if (!entry) return "";
   if (tracker.tracker_type === "binary") return entry.binary_value ? "good" : "bad";
+  const rule = tracker.color_rule;
+  if (rule?.operator && rule.value !== "" && rule.value != null) {
+    let actual;
+    if (tracker.tracker_type === "number") actual = Number(entry.number_value);
+    if (tracker.tracker_type === "duration") actual = Number(entry.duration_minutes) / 60;
+    if (tracker.tracker_type === "rating") actual = Number(entry.rating_value);
+    if (tracker.tracker_type === "time") actual = entry.time_value?.slice(0, 5);
+    if (tracker.tracker_type === "text") actual = entry.text_value;
+    if (tracker.tracker_type === "prayer") actual = Object.values(entry.prayer_values || {}).filter(Boolean).length;
+    if (actual !== undefined && actual !== null && !(typeof actual === "number" && !Number.isFinite(actual))) {
+      const target = rule.value;
+      let matches = false;
+      if (rule.operator === "gte") matches = actual >= target;
+      if (rule.operator === "lte") matches = actual <= target;
+      if (rule.operator === "contains") matches = String(actual).toLocaleLowerCase().includes(String(target).toLocaleLowerCase());
+      if (rule.operator === "equals") matches = String(actual).toLocaleLowerCase() === String(target).toLocaleLowerCase();
+      return matches ? "good" : "bad";
+    }
+  }
   if (tracker.tracker_type === "rating" && entry.rating_value !== null) {
     const min = tracker.min_value ?? 0;
     const max = tracker.max_value ?? 5;
