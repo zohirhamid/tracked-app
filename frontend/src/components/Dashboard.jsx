@@ -100,7 +100,7 @@ function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, on
     <InlineEditor tracker={tracker} entry={entry} date={day.date} onCancel={() => setActiveCell(null)} onSave={(result) => { setActiveCell(null); onSaved(day.date, tracker.id, result); }} onError={onError} />
   </td>;
   const open = () => setActiveCell(`${day.date}:${tracker.id}`);
-  const tone = entryTone(entry, tracker);
+  const tone = isPastEmpty ? "bad" : entryTone(entry, tracker);
   return <td
     tabIndex="0" data-date={day.date} data-tracker-id={tracker.id} data-type={tracker.tracker_type}
     className={`${tone}${tracker.tracker_type === "text" ? `${tone ? " " : ""}note` : ""}${isPastEmpty ? `${tone || tracker.tracker_type === "text" ? " " : ""}past-empty` : ""}`}
