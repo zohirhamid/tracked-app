@@ -8,6 +8,17 @@ const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const dateColumnWidth = 86;
 const columnWidths = { binary: 66, number: 78, time: 78, duration: 76, rating: 66, prayer: 84, text: 220 };
 
+function shouldUseMobileLayout() {
+  if (typeof window === "undefined") return false;
+  const forcedView = new URLSearchParams(window.location.search).get("view");
+  if (forcedView === "mobile") return true;
+  if (forcedView === "desktop") return false;
+  const compactViewport = window.matchMedia("(max-width: 900px)").matches;
+  const touchLayout = window.matchMedia("(pointer: coarse)").matches && window.innerWidth <= 1100;
+  const reportedMobile = navigator.userAgentData?.mobile === true || /Android|iPhone|iPod|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return compactViewport || touchLayout || reportedMobile;
+}
+
 function valuePayload(tracker, date, value) {
   const payload = { tracker_id: tracker.id, date };
   if (tracker.tracker_type === "prayer") {
@@ -150,7 +161,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   const [localStatus, setLocalStatus] = useState("");
   const [viewMode, setViewMode] = useState("week");
   const [weekIndex, setWeekIndex] = useState(0);
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 720px)").matches);
+  const [isMobile, setIsMobile] = useState(shouldUseMobileLayout);
   const today = new Date();
   const monthText = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(visibleMonth);
   const monthValue = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}`;
@@ -168,10 +179,20 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   }, [loadedMonthKey]);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 720px)");
-    const update = (event) => setIsMobile(event.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
+    const widthQuery = window.matchMedia("(max-width: 900px)");
+    const pointerQuery = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsMobile(shouldUseMobileLayout());
+    widthQuery.addEventListener("change", update);
+    pointerQuery.addEventListener("change", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    update();
+    return () => {
+      widthQuery.removeEventListener("change", update);
+      pointerQuery.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
   }, []);
 
   const weekText = (() => {

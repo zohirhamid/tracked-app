@@ -2714,7 +2714,3 @@ textarea:focus {
 }
 .mobile-calendar-legend span:first-child { display: flex; align-items: center; gap: 6px; }
 .mobile-calendar-legend span > i { width: 7px; height: 7px; border-radius: 50%; background: var(--foreground); }
-
-@media (min-width: 721px) {
-  .mobile-logger-shell { display: none; }
-}
