@@ -104,6 +104,7 @@ function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, on
   return <td
     tabIndex="0" data-date={day.date} data-tracker-id={tracker.id} data-type={tracker.tracker_type}
     className={`${tone}${tracker.tracker_type === "text" ? `${tone ? " " : ""}note` : ""}${isPastEmpty ? `${tone || tracker.tracker_type === "text" ? " " : ""}past-empty` : ""}`}
+    title={tracker.tracker_type === "text" && value ? value : undefined}
     aria-label={`${tracker.name}, ${day.date}${value ? `: ${value}` : ", empty"}`}
     onClick={open} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } }}
   >{isPastEmpty ? "—" : value}</td>;
