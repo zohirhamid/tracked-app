@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { dateParts, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, summarizeTrackers } from "../../lib.mjs";
 import { request } from "../api.js";
 import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
+import MobileLogger from "./MobileLogger.jsx";
 
 const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const dateColumnWidth = 86;
@@ -149,6 +150,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   const [localStatus, setLocalStatus] = useState("");
   const [viewMode, setViewMode] = useState("week");
   const [weekIndex, setWeekIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 720px)").matches);
   const today = new Date();
   const monthText = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(visibleMonth);
   const monthValue = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}`;
@@ -164,6 +166,13 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
     setWeekIndex(todayIndex >= 0 ? todayIndex : 0);
     setActiveCell(null);
   }, [loadedMonthKey]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const update = (event) => setIsMobile(event.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const weekText = (() => {
     if (!activeWeek.length) return monthText;
@@ -206,6 +215,20 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   }
 
   const displayStatus = localStatus || status.message;
+  if (isMobile) return <>
+    <MobileLogger
+      visibleMonth={visibleMonth}
+      setVisibleMonth={setVisibleMonth}
+      monthData={monthData}
+      loading={loading}
+      status={status}
+      loadMonth={loadMonth}
+      onManageTrackers={() => setTrackerDialog(true)}
+      onSignOut={onSignOut}
+    />
+    <TrackerDialog open={trackerDialog} onClose={() => setTrackerDialog(false)} onMonthRefresh={loadMonth} />
+  </>;
+
   return <>
     <div className="topbar">
       <div className="brand-group"><span className="index-tag" id="index-year">(INDEX) {visibleMonth.getFullYear()}</span><a className="brand-title" href="/">LIFELOG</a></div>
