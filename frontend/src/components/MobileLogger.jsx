@@ -114,14 +114,13 @@ function WeekOverview({ week, trackers, today, onChooseDay }) {
       const dateValue = dateFromKey(day.date);
       const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(dateValue);
       const entries = trackers.map((tracker) => ({ tracker, entry: entryFor(day, tracker.id) })).filter((item) => item.entry);
-      return <button type="button" className={day.date === today ? "today" : ""} key={day.date} onClick={() => onChooseDay(day.date)}>
-        <span className="mobile-week-date"><strong>{String(day.day).padStart(2, "0")}</strong><small>{dayName}</small></span>
-        <span className="mobile-week-values">
-          {entries.length ? entries.slice(0, 3).map(({ tracker, entry }) => <span className={entryTone(entry, tracker)} key={tracker.id}><b>{tracker.name}</b>{formatEntry(entry, tracker)}</span>) : <em>Nothing logged</em>}
-          {entries.length > 3 ? <em>+{entries.length - 3} more</em> : null}
-        </span>
+      return <article className={day.date === today ? "today" : ""} key={day.date}>
+        <button type="button" className="mobile-week-date" onClick={() => onChooseDay(day.date)} aria-label={`Open ${dayName} ${day.day}`}><strong>{String(day.day).padStart(2, "0")}</strong><small>{dayName}</small></button>
+        <div className="mobile-week-values" role="list" aria-label={`${dayName} logged trackers`}>
+          {entries.length ? entries.map(({ tracker, entry }) => <span className={entryTone(entry, tracker)} key={tracker.id} role="listitem"><b>{tracker.name}</b>{formatEntry(entry, tracker)}</span>) : <em>Nothing logged</em>}
+        </div>
         <DayCompletion day={day} trackers={trackers} />
-      </button>;
+      </article>;
     })}
   </section>;
 }

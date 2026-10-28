@@ -2642,7 +2642,7 @@ textarea:focus {
   gap: 8px;
 }
 
-.mobile-week-overview > button {
+.mobile-week-overview > article {
   position: relative;
   width: 100%;
   min-height: 76px;
@@ -2656,21 +2656,46 @@ textarea:focus {
   border-radius: 7px;
   background: var(--card);
   color: var(--foreground);
-  cursor: pointer;
   text-align: left;
 }
 
-.mobile-week-overview > button.today { border-color: var(--foreground); box-shadow: inset 3px 0 var(--foreground); }
-.mobile-week-overview > button:active { transform: scale(.99); }
+.mobile-week-overview > article.today { border-color: var(--foreground); box-shadow: inset 3px 0 var(--foreground); }
 
-.mobile-week-date { display: grid; justify-items: center; gap: 3px; }
+.mobile-week-date {
+  width: 42px;
+  min-height: 48px;
+  padding: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.mobile-week-date:hover,
+.mobile-week-date:focus-visible { background: var(--secondary); }
 .mobile-week-date strong { font: 850 21px/1 var(--font-display); }
 .mobile-week-date small { color: var(--muted-foreground); font: 800 8px/1 var(--default-mono-font-family); letter-spacing: .06em; text-transform: uppercase; }
 
-.mobile-week-values { min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; }
-.mobile-week-values > span {
+.mobile-week-values {
   min-width: 0;
-  max-width: 34%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.mobile-week-values::-webkit-scrollbar { display: none; }
+.mobile-week-values > span {
+  min-width: 92px;
+  max-width: 128px;
+  flex: 0 0 auto;
   padding: 7px 8px;
   display: grid;
   gap: 3px;
@@ -2681,6 +2706,7 @@ textarea:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 .mobile-week-values > span b { overflow: hidden; color: var(--muted-foreground); font-size: 6px; letter-spacing: .03em; text-overflow: ellipsis; text-transform: uppercase; }
 .mobile-week-values > span.good { background: var(--positive-bg); color: var(--positive); }
@@ -2696,7 +2722,7 @@ textarea:focus {
   background: var(--secondary);
 }
 .mobile-completion i { height: 100%; display: block; border-radius: inherit; background: var(--foreground); }
-.mobile-week-overview > button > .mobile-completion { position: absolute; right: 14px; bottom: 8px; left: 68px; }
+.mobile-week-overview > article > .mobile-completion { position: absolute; right: 14px; bottom: 8px; left: 68px; }
 
 .mobile-month-overview {
   overflow: hidden;

@@ -133,6 +133,8 @@ test.describe("mobile daily logger", () => {
 
     await page.getByRole("button", { name: "WEEK" }).click();
     await expect(page.getByRole("region", { name: "Weekly overview" })).toBeVisible();
+    await expect(page.getByText(/\+\d+ more/i)).toHaveCount(0);
+    await expect(page.locator(".mobile-week-values").first()).toHaveCSS("overflow-x", "auto");
     await expect(page.locator("html")).toHaveJSProperty("scrollWidth", 390);
 
     await page.getByRole("button", { name: "MONTH" }).click();
