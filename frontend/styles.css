@@ -2539,8 +2539,17 @@ textarea:focus {
 .prayer-picker button span { font-size: 16px; }
 .prayer-picker button.selected { border-color: var(--foreground); background: var(--positive-bg); color: var(--positive); }
 
-.mobile-input-wrap { position: relative; }
+.mobile-input-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
 .mobile-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 58px;
   padding: 10px 76px 10px 14px;
   border-radius: 5px;
@@ -2548,6 +2557,20 @@ textarea:focus {
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 700;
+}
+.mobile-input-time input {
+  padding-right: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  font-size: 16px;
+}
+.mobile-input-time input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+.mobile-input-time input::-webkit-datetime-edit {
+  min-width: 0;
+  padding: 0;
 }
 .mobile-input-wrap > span {
   position: absolute;

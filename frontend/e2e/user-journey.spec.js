@@ -89,6 +89,7 @@ test.describe("mobile daily logger", () => {
     const mobilePassword = `Tracked-mobile-${mobileRunId}!`;
     const mobileUsername = `tracked_mobile_${mobileRunId.replaceAll("-", "_")}`.slice(0, 150);
     const mobileTracker = `Mood ${mobileRunId}`;
+    const mobileTimeTracker = `Wake ${mobileRunId}`;
 
     await page.goto("/");
     await page.getByRole("button", { name: "Create an account" }).click();
@@ -111,9 +112,22 @@ test.describe("mobile daily logger", () => {
     await page.getByLabel("Maximum").fill("5");
     await page.getByRole("button", { name: "ADD TRACKER" }).click();
     await expect(page.getByRole("heading", { name: mobileTracker })).toBeVisible();
+
+    await page.getByRole("button", { name: /NEW TRACKER/ }).click();
+    await page.getByLabel("Name").fill(mobileTimeTracker);
+    await page.getByRole("radio", { name: "Time" }).check();
+    await page.getByRole("button", { name: "ADD TRACKER" }).click();
+    await expect(page.getByRole("heading", { name: mobileTimeTracker })).toBeVisible();
     await page.getByRole("button", { name: "Close" }).click();
 
     await page.getByRole("radio", { name: "Great" }).click();
+    const timeField = page.locator(".mobile-tracker-field").filter({ hasText: mobileTimeTracker });
+    const timeInput = timeField.locator('input[type="time"]');
+    await timeInput.fill("09:30");
+    const fieldBox = await timeField.boundingBox();
+    const timeBox = await timeInput.boundingBox();
+    expect(timeBox.x).toBeGreaterThanOrEqual(fieldBox.x);
+    expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(fieldBox.x + fieldBox.width);
     await page.getByRole("button", { name: /SAVE DAY/ }).click();
     await expect(page.getByRole("status")).toContainText("Day saved");
 
@@ -133,6 +147,10 @@ test.describe("mobile daily logger", () => {
     await page.setViewportSize({ width: 320, height: 700 });
     await expect(page.getByRole("navigation", { name: "Mobile tracker view" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Great" })).toBeVisible();
+    const narrowFieldBox = await timeField.boundingBox();
+    const narrowTimeBox = await timeInput.boundingBox();
+    expect(narrowTimeBox.x).toBeGreaterThanOrEqual(narrowFieldBox.x);
+    expect(narrowTimeBox.x + narrowTimeBox.width).toBeLessThanOrEqual(narrowFieldBox.x + narrowFieldBox.width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(runtimeErrors).toEqual([]);
   });

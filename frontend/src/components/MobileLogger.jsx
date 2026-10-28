@@ -89,7 +89,7 @@ function TrackerControl({ tracker, value, onChange }) {
   if (tracker.tracker_type === "text") return <textarea className="mobile-textarea" rows="4" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Add a note about your day…" />;
 
   const type = tracker.tracker_type === "time" ? "time" : "number";
-  return <div className="mobile-input-wrap">
+  return <div className={`mobile-input-wrap mobile-input-${tracker.tracker_type}`}>
     <input
       type={type}
       value={value}
