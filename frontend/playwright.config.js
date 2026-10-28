@@ -14,6 +14,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: deploymentUrl || "http://127.0.0.1:5173",
+    channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

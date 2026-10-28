@@ -74,3 +74,66 @@ test("Google sign-in reaches the configured provider", async ({ page }) => {
     "/accounts/google/login/callback/",
   );
 });
+
+test.describe("mobile daily logger", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("switches automatically and supports log, week, and month views", async ({ page }) => {
+    const runtimeErrors = [];
+    page.on("pageerror", (error) => runtimeErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) runtimeErrors.push(message.text());
+    });
+    const mobileRunId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const mobileEmail = `tracked-mobile-${mobileRunId}@example.com`;
+    const mobilePassword = `Tracked-mobile-${mobileRunId}!`;
+    const mobileUsername = `tracked_mobile_${mobileRunId.replaceAll("-", "_")}`.slice(0, 150);
+    const mobileTracker = `Mood ${mobileRunId}`;
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Create an account" }).click();
+    await page.getByLabel("Email").fill(mobileEmail);
+    await page.getByLabel("Password", { exact: true }).fill(mobilePassword);
+    await page.getByLabel("Confirm password").fill(mobilePassword);
+    await page.getByRole("button", { name: "CREATE ACCOUNT" }).click();
+    await page.getByLabel("Username").fill(mobileUsername);
+    await page.getByRole("button", { name: "CONTINUE" }).click();
+
+    await expect(page.getByRole("navigation", { name: "Mobile tracker view" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "LOG" })).toHaveClass(/active/);
+    await expect(page.getByRole("button", { name: "\+ LOG ENTRY" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "TRACKERS" }).click();
+    await page.getByRole("button", { name: /NEW TRACKER/ }).click();
+    await page.getByLabel("Name").fill(mobileTracker);
+    await page.getByRole("radio", { name: "Rating" }).check();
+    await page.getByLabel("Minimum").fill("1");
+    await page.getByLabel("Maximum").fill("5");
+    await page.getByRole("button", { name: "ADD TRACKER" }).click();
+    await expect(page.getByRole("heading", { name: mobileTracker })).toBeVisible();
+    await page.getByRole("button", { name: "Close" }).click();
+
+    await page.getByRole("radio", { name: "Great" }).click();
+    await page.getByRole("button", { name: /SAVE DAY/ }).click();
+    await expect(page.getByRole("status")).toContainText("Day saved");
+
+    await page.getByRole("button", { name: "WEEK" }).click();
+    await expect(page.getByRole("region", { name: "Weekly overview" })).toBeVisible();
+    await expect(page.locator("html")).toHaveJSProperty("scrollWidth", 390);
+
+    await page.getByRole("button", { name: "MONTH" }).click();
+    await expect(page.getByRole("region", { name: "Monthly overview" })).toBeVisible();
+    const noHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(noHorizontalOverflow).toBe(true);
+
+    await page.getByRole("region", { name: "Monthly overview" }).getByRole("button").filter({ hasText: String(new Date().getDate()) }).first().click();
+    await expect(page.getByRole("button", { name: "LOG" })).toHaveClass(/active/);
+    await expect(page.getByRole("radio", { name: "Great" })).toHaveAttribute("aria-checked", "true");
+
+    await page.setViewportSize({ width: 320, height: 700 });
+    await expect(page.getByRole("navigation", { name: "Mobile tracker view" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Great" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(runtimeErrors).toEqual([]);
+  });
+});
