@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   apiBaseUrl,
+  buildTrackerGroups,
   canonicalDevelopmentUrl,
   dateParts,
   durationHoursFromMinutes,
@@ -71,6 +72,21 @@ test("canonicalizes development host aliases for OAuth origin matching", () => {
 test("flattens API weeks without changing day order", () => {
   assert.deepEqual(flattenDays([[{ day: 1 }, { day: 2 }], [{ day: 3 }]]), [
     { day: 1 }, { day: 2 }, { day: 3 },
+  ]);
+});
+
+test("places trackers with the same column group beside each other", () => {
+  const groups = buildTrackerGroups([
+    { id: 1, name: "Calories", group_name: "Diet" },
+    { id: 2, name: "Bedtime", group_name: "Sleep" },
+    { id: 3, name: "Protein", group_name: "diet" },
+    { id: 4, name: "Notes", group_name: "" },
+  ]);
+
+  assert.deepEqual(groups.map((group) => [group.name, group.trackers.map((tracker) => tracker.id)]), [
+    ["Diet", [1, 3]],
+    ["Sleep", [2]],
+    ["Ungrouped", [4]],
   ]);
 });
 

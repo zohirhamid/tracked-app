@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { dateParts, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, summarizeTrackers } from "../../lib.mjs";
+import { buildTrackerGroups, dateParts, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, summarizeTrackers } from "../../lib.mjs";
 import { request } from "../api.js";
 import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
 import MobileLogger from "./MobileLogger.jsx";
@@ -123,12 +123,17 @@ function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, on
 }
 
 function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell, onSaved, onError }) {
-  const trackers = data?.trackers || [];
+  const trackerGroups = buildTrackerGroups(data?.trackers || []);
+  const trackers = trackerGroups.flatMap((group) => group.trackers);
+  const hasNamedGroups = trackerGroups.some((group) => !group.isUngrouped);
   const width = Math.max(dateColumnWidth + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 78), 0), 520);
   return <div className={`tracker-table-wrap${viewMode === "week" ? " week-view" : ""}`} tabIndex="0" aria-label="Tracker sheet: scroll vertically through dates and horizontally through trackers">
     <table className={`tracker-table${loading ? " is-loading" : ""}`} style={{ width }}>
       <colgroup><col className="col-date" style={{ width: dateColumnWidth }} />{trackers.map((tracker) => <col key={tracker.id} data-type={tracker.tracker_type} style={{ width: columnWidths[tracker.tracker_type] || 78 }} />)}</colgroup>
-      <thead><tr><th scope="col">DATE</th>{trackers.map((tracker) => <th key={tracker.id} scope="col" title={`${tracker.name} · ${tracker.tracker_type}`}>{tracker.name}</th>)}</tr></thead>
+      <thead>{hasNamedGroups ? <>
+        <tr className="tracker-group-row"><th scope="col" rowSpan="2">DATE</th>{trackerGroups.map((group) => <th className={group.isUngrouped ? "ungrouped" : ""} key={group.key} scope="colgroup" colSpan={group.trackers.length}>{group.name}</th>)}</tr>
+        <tr className="tracker-column-row">{trackerGroups.flatMap((group) => group.trackers.map((tracker) => <th key={tracker.id} scope="col" title={`${tracker.name} · ${tracker.tracker_type}`}>{tracker.name}</th>))}</tr>
+      </> : <tr><th scope="col">DATE</th>{trackers.map((tracker) => <th key={tracker.id} scope="col" title={`${tracker.name} · ${tracker.tracker_type}`}>{tracker.name}</th>)}</tr>}</thead>
       <tbody>{days.map((day) => {
         const rowDate = dateParts(day.date);
         const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(rowDate).toUpperCase();

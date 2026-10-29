@@ -506,10 +506,36 @@ button:disabled {
   border-right-color: color-mix(in oklch, var(--foreground), transparent 86%);
 }
 
-.tracker-table thead th:first-child {
+.tracker-table thead tr:first-child > th:first-child {
   position: sticky;
   left: 0;
   z-index: 5;
+}
+
+.tracker-table .tracker-group-row th {
+  height: 24px;
+  border-bottom-color: color-mix(in oklch, var(--foreground), transparent 72%);
+  background: #e9e6df;
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .11em;
+  text-align: center;
+}
+
+.tracker-table .tracker-group-row th.ungrouped {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+.tracker-table .tracker-group-row > th:first-child {
+  text-align: left;
+}
+
+.tracker-table .tracker-column-row th {
+  height: 25px;
+  background: var(--secondary);
+  text-align: left;
 }
 
 .tracker-table tbody th,
@@ -1761,6 +1787,16 @@ textarea:focus {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 110px;
   gap: 12px;
+}
+
+.tracker-field-grid .tracker-group-field {
+  grid-column: 1 / -1;
+}
+
+.tracker-group-field > small {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  font: italic 11px/1.35 Georgia, serif;
 }
 
 .tracker-type-fieldset {

@@ -2,6 +2,25 @@ export function flattenDays(weeks) {
   return (weeks || []).flatMap((week) => week || []);
 }
 
+export function buildTrackerGroups(trackers) {
+  const groups = new Map();
+  (trackers || []).forEach((tracker, index) => {
+    const name = String(tracker.group_name || "").trim();
+    const key = name ? name.toLocaleLowerCase() : "__ungrouped__";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        name: name || "Ungrouped",
+        isUngrouped: !name,
+        firstIndex: index,
+        trackers: [],
+      });
+    }
+    groups.get(key).trackers.push(tracker);
+  });
+  return [...groups.values()].sort((left, right) => left.firstIndex - right.firstIndex);
+}
+
 export function durationHoursFromMinutes(minutes) {
   if (minutes == null || minutes === "") return "";
   return Number((Number(minutes) / 60).toFixed(2));

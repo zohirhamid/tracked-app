@@ -5,6 +5,7 @@ const email = `tracked-e2e-${runId}@example.com`;
 const password = `Tracked-e2e-${runId}!`;
 const username = `tracked_e2e_${runId.replaceAll("-", "_")}`.slice(0, 150);
 const trackerName = `Mood ${runId}`;
+const groupedTrackerName = `Energy ${runId}`;
 
 test("complete email account and tracking journey", async ({ page }) => {
   await page.goto("/");
@@ -22,13 +23,24 @@ test("complete email account and tracking journey", async ({ page }) => {
   await expect(page.getByRole("button", { name: "TRACKERS" })).toBeVisible();
   await page.getByRole("button", { name: "TRACKERS" }).click();
   await page.getByRole("button", { name: /NEW TRACKER/ }).click();
-  await page.getByLabel("Name").fill(trackerName);
+  await page.getByLabel("Name", { exact: true }).fill(trackerName);
+  await page.getByLabel("Column group").fill("Wellbeing");
   await page.getByRole("radio", { name: "Rating" }).check();
   await page.getByLabel("Minimum").fill("1");
   await page.getByLabel("Maximum").fill("5");
   await page.getByRole("button", { name: "ADD TRACKER" }).click();
   await expect(page.getByRole("heading", { name: trackerName })).toBeVisible();
+
+  await page.getByRole("button", { name: /NEW TRACKER/ }).click();
+  await page.getByLabel("Name", { exact: true }).fill(groupedTrackerName);
+  await page.getByLabel("Column group").fill("Wellbeing");
+  await page.getByRole("button", { name: "ADD TRACKER" }).click();
+  await expect(page.getByRole("heading", { name: groupedTrackerName })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
+
+  await expect(page.getByRole("columnheader", { name: "Wellbeing" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: groupedTrackerName })).toBeVisible();
 
   await page.getByRole("button", { name: "+ LOG ENTRY" }).click();
   await page.getByLabel("Value").fill("4");
@@ -37,16 +49,17 @@ test("complete email account and tracking journey", async ({ page }) => {
   const loggedCell = page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 4/5$`) });
   await expect(loggedCell).toBeVisible();
   await loggedCell.click();
-  const inlineEditor = loggedCell.locator("input.inline-editor");
+  const inlineEditor = page.locator("td.editing input.inline-editor");
   await inlineEditor.fill("5");
   await inlineEditor.press("Enter");
   await expect(page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 5/5$`) })).toBeVisible();
 
+  await page.getByRole("button", { name: "MONTH" }).click();
   const currentMonth = (await page.getByRole("heading", { level: 1 }).textContent()).trim();
   const currentMonthIndex = new Date().getMonth();
   const alternativeMonthIndex = (currentMonthIndex + 11) % 12;
-  const alternativeMonth = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, alternativeMonthIndex, 1)).toUpperCase();
-  const currentMonthTab = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, currentMonthIndex, 1)).toUpperCase();
+  const alternativeMonth = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, alternativeMonthIndex, 1)).slice(0, 3).toUpperCase();
+  const currentMonthTab = new Intl.DateTimeFormat("en-GB", { month: "short" }).format(new Date(2026, currentMonthIndex, 1)).slice(0, 3).toUpperCase();
   await page.getByRole("tab", { name: alternativeMonth }).click();
   await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(currentMonth);
   await page.getByRole("tab", { name: currentMonthTab }).click();
@@ -56,9 +69,10 @@ test("complete email account and tracking journey", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "SIGN IN" }).click();
+  await page.getByRole("button", { name: "SIGN IN", exact: true }).click();
   await expect(page.getByRole("button", { name: "SIGN OUT" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Wellbeing" })).toBeVisible();
 });
 
 test("Google sign-in reaches the configured provider", async ({ page }) => {
@@ -106,7 +120,7 @@ test.describe("mobile daily logger", () => {
 
     await page.getByRole("button", { name: "TRACKERS" }).click();
     await page.getByRole("button", { name: /NEW TRACKER/ }).click();
-    await page.getByLabel("Name").fill(mobileTracker);
+    await page.getByLabel("Name", { exact: true }).fill(mobileTracker);
     await page.getByRole("radio", { name: "Rating" }).check();
     await page.getByLabel("Minimum").fill("1");
     await page.getByLabel("Maximum").fill("5");
@@ -114,7 +128,7 @@ test.describe("mobile daily logger", () => {
     await expect(page.getByRole("heading", { name: mobileTracker })).toBeVisible();
 
     await page.getByRole("button", { name: /NEW TRACKER/ }).click();
-    await page.getByLabel("Name").fill(mobileTimeTracker);
+    await page.getByLabel("Name", { exact: true }).fill(mobileTimeTracker);
     await page.getByRole("radio", { name: "Time" }).check();
     await page.getByRole("button", { name: "ADD TRACKER" }).click();
     await expect(page.getByRole("heading", { name: mobileTimeTracker })).toBeVisible();

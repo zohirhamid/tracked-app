@@ -35,6 +35,12 @@ class Tracker(models.Model):
         related_name="trackers",
     )
     name = models.CharField(max_length=100)
+    group_name = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Optional heading used to group adjacent tracker columns",
+    )
     tracker_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     unit = models.CharField(max_length=20, blank=True, null=True)
     display_order = models.IntegerField(default=0)

@@ -132,7 +132,15 @@ export function EntryDialog({ state, trackers, onClose, onSaved }) {
   </dialog>;
 }
 
-function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
+function GroupNameField({ value, onChange, groupNames, name }) {
+  return <label className="tracker-group-field">Column group <span className="field-hint">Optional</span>
+    <input name={name} list="tracker-group-options" value={value} onChange={onChange} maxLength="80" placeholder="e.g. Diet, Exercise, Sleep" />
+    <small>Trackers with the same group name appear together under one heading.</small>
+    <datalist id="tracker-group-options">{groupNames.map((groupName) => <option value={groupName} key={groupName} />)}</datalist>
+  </label>;
+}
+
+function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
   const [values, setValues] = useState(tracker);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -152,6 +160,7 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
         method: "PATCH",
         body: JSON.stringify({
           name: values.name,
+          group_name: values.group_name?.trim() || "",
           tracker_type: values.tracker_type,
           unit: values.tracker_type === "number" ? values.unit || null : values.tracker_type === "duration" ? "h" : null,
           display_order: Number(values.display_order) || 0,
@@ -181,6 +190,7 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
     <div className="tracker-field-grid">
       <label className="tracker-name-field">Name<input value={values.name} onChange={(event) => change("name", event.target.value)} maxLength="100" required autoFocus /></label>
       <label>Position<input type="number" min="0" value={values.display_order} onChange={(event) => change("display_order", event.target.value)} /></label>
+      <GroupNameField value={values.group_name || ""} onChange={(event) => change("group_name", event.target.value)} groupNames={groupNames} />
     </div>
     <fieldset className="tracker-type-fieldset">
       <legend>Format</legend>
@@ -207,13 +217,15 @@ function TrackerEditor({ tracker, onSaved, onDelete, setError }) {
   </form>;
 }
 
-function NewTrackerForm({ onCreate, onCancel, creating }) {
+function NewTrackerForm({ groupNames, onCreate, onCancel, creating }) {
   const [type, setType] = useState("binary");
   const [colorRule, setColorRule] = useState({});
+  const [groupName, setGroupName] = useState("");
   const details = trackerTypeDetails[type];
   return <form className="tracker-editor new-tracker-editor" onSubmit={onCreate}>
     <div className="tracker-editor-heading"><div><p className="index-tag">NEW TRACKER</p><h3>What do you want to track?</h3></div></div>
     <label>Name<input name="name" maxLength="100" placeholder="e.g. Read, Mood, Water" required autoFocus /></label>
+    <GroupNameField name="group_name" value={groupName} onChange={(event) => setGroupName(event.target.value)} groupNames={groupNames} />
     <fieldset className="tracker-type-fieldset">
       <legend>Format</legend>
       <div className="tracker-type-grid">{trackerTypes.map((value) => <label className={`tracker-type-option${type === value ? " selected" : ""}`} key={value}>
@@ -266,6 +278,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
     try {
       const created = await request("/tracker/trackers/create/", { method: "POST", body: JSON.stringify({
         name: form.get("name"), tracker_type: form.get("tracker_type"), unit: form.get("tracker_type") === "duration" ? "h" : form.get("unit") || null,
+        group_name: form.get("group_name")?.trim() || "",
         min_value: !form.get("min_value") ? null : Number(form.get("min_value")),
         max_value: !form.get("max_value") ? null : Number(form.get("max_value")),
         color_rule: JSON.parse(form.get("color_rule") || "{}"),
@@ -293,6 +306,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
 
   if (!open) return null;
   const selectedTracker = trackers.find((tracker) => tracker.id === selectedId);
+  const groupNames = [...new Set(trackers.map((tracker) => tracker.group_name).filter(Boolean))];
   return <>
     <dialog className="app-dialog tracker-dialog" ref={dialogRef} onCancel={onClose} aria-labelledby="tracker-dialog-title">
       <div className="tracker-dialog-shell">
@@ -303,7 +317,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
             <div className="tracker-list" role="listbox" aria-label="Trackers">
               {trackers.map((tracker) => <button type="button" role="option" aria-selected={!showNew && tracker.id === selectedId} className={`tracker-list-item${!showNew && tracker.id === selectedId ? " selected" : ""}`} key={tracker.id} onClick={() => { setSelectedId(tracker.id); setShowNew(false); setError(""); }}>
                 <span className="tracker-list-glyph">{trackerTypeDetails[tracker.tracker_type]?.glyph}</span>
-                <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
+                <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{tracker.group_name ? `${tracker.group_name} · ` : ""}{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
                 {!tracker.is_active && <span className="tracker-paused-dot" title="Paused">○</span>}
               </button>)}
               {loading && !trackers.length && <p className="tracker-empty-state">Loading trackers…</p>}
@@ -311,7 +325,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
             </div>
           </aside>
           <section className="tracker-detail-panel">
-            {showNew ? <NewTrackerForm onCreate={create} onCancel={() => setShowNew(false)} creating={creating} /> : selectedTracker ? <TrackerEditor key={selectedTracker.id} tracker={selectedTracker} onSaved={async (id) => { await load(); setSelectedId(id); await onMonthRefresh(); }} onDelete={setDeleteTarget} setError={setError} /> : <div className="tracker-detail-empty"><span>+</span><h3>Build your tracker grid</h3><p>Add a tracker to start logging what matters to you.</p><button className="log-entry-button" type="button" onClick={() => setShowNew(true)}>ADD YOUR FIRST TRACKER</button></div>}
+            {showNew ? <NewTrackerForm groupNames={groupNames} onCreate={create} onCancel={() => setShowNew(false)} creating={creating} /> : selectedTracker ? <TrackerEditor key={selectedTracker.id} tracker={selectedTracker} groupNames={groupNames} onSaved={async (id) => { await load(); setSelectedId(id); await onMonthRefresh(); }} onDelete={setDeleteTarget} setError={setError} /> : <div className="tracker-detail-empty"><span>+</span><h3>Build your tracker grid</h3><p>Add a tracker to start logging what matters to you.</p><button className="log-entry-button" type="button" onClick={() => setShowNew(true)}>ADD YOUR FIRST TRACKER</button></div>}
             {error && <p className="form-error tracker-dialog-error" role="alert">{error}</p>}
           </section>
         </div>

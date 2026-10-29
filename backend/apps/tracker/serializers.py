@@ -27,11 +27,14 @@ class TrackerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tracker
         fields = [
-            'id', 'name', 'tracker_type', 'unit',
+            'id', 'name', 'group_name', 'tracker_type', 'unit',
             'display_order', 'is_active', 'min_value', 'max_value',
             'color_rule', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
+
+    def validate_group_name(self, value):
+        return ' '.join(value.split())
 
     def validate(self, attrs):
         tracker_type = attrs.get(
