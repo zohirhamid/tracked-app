@@ -183,8 +183,12 @@ test("assigns semantic tones to binary, rating, and prayer entries", () => {
 
 test("assigns good and bad tones from custom tracker colour rules", () => {
   assert.equal(entryTone({ number_value: "8" }, { tracker_type: "number", color_rule: { operator: "gte", value: 10 } }), "bad");
+  assert.equal(entryTone({ number_value: "8" }, { tracker_type: "number", color_rule: { operator: "between", min: 7, max: 9 } }), "good");
+  assert.equal(entryTone({ number_value: "10" }, { tracker_type: "number", color_rule: { operator: "between", min: 7, max: 9 } }), "bad");
   assert.equal(entryTone({ duration_minutes: 480 }, { tracker_type: "duration", color_rule: { operator: "gte", value: 7.5 } }), "good");
   assert.equal(entryTone({ time_value: "22:15:00" }, { tracker_type: "time", color_rule: { operator: "lte", value: "22:30" } }), "good");
+  assert.equal(entryTone({ time_value: "23:30:00" }, { tracker_type: "time", color_rule: { operator: "between", min: "22:00", max: "01:00" } }), "good");
+  assert.equal(entryTone({ time_value: "12:00:00" }, { tracker_type: "time", color_rule: { operator: "between", min: "22:00", max: "01:00" } }), "bad");
   assert.equal(entryTone({ text_value: "Deep focus session" }, { tracker_type: "text", color_rule: { operator: "contains", value: "focus" } }), "good");
   assert.equal(entryTone({ prayer_values: { fajr: true, dhuhr: true, asr: false, maghrib: true, isha: false } }, { tracker_type: "prayer", color_rule: { operator: "gte", value: 4 } }), "bad");
 });

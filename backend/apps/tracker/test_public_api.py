@@ -54,6 +54,19 @@ class AuthenticatedTrackerApiTests(APITestCase):
         )
         self.assertEqual(created.status_code, 201, created.content)
         self.assertEqual(created.json()["color_rule"], {"operator": "gte", "value": 7.5})
+        ranged = self.client.patch(
+            f"/api/v1/tracker/trackers/{created.json()['id']}/",
+            {"color_rule": {"operator": "between", "min": 7, "max": 9}},
+            format="json",
+        )
+        self.assertEqual(ranged.status_code, 200, ranged.content)
+        self.assertEqual(ranged.json()["color_rule"], {"operator": "between", "min": 7.0, "max": 9.0})
+        reversed_range = self.client.patch(
+            f"/api/v1/tracker/trackers/{created.json()['id']}/",
+            {"color_rule": {"operator": "between", "min": 9, "max": 7}},
+            format="json",
+        )
+        self.assertEqual(reversed_range.status_code, 400)
         invalid = self.client.patch(
             f"/api/v1/tracker/trackers/{created.json()['id']}/",
             {"color_rule": {"operator": "contains", "value": "eight"}},

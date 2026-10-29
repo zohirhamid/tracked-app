@@ -52,12 +52,33 @@ class TrackerSerializer(serializers.ModelSerializer):
         operator = rule.get('operator')
         value = rule.get('value')
         operators = {
-            'number': {'gte', 'lte'}, 'duration': {'gte', 'lte'},
-            'rating': {'gte', 'lte'}, 'time': {'gte', 'lte'},
+            'number': {'gte', 'lte', 'between'},
+            'duration': {'gte', 'lte', 'between'},
+            'rating': {'gte', 'lte', 'between'},
+            'time': {'gte', 'lte', 'between'},
             'text': {'contains', 'equals'}, 'prayer': {'gte'},
         }
         if operator not in operators.get(tracker_type, set()):
             raise serializers.ValidationError({'color_rule': 'Choose a valid rule for this tracker type.'})
+        if operator == 'between':
+            lower = rule.get('min')
+            upper = rule.get('max')
+            if tracker_type == 'time':
+                try:
+                    lower = datetime.strptime(str(lower), '%H:%M').strftime('%H:%M')
+                    upper = datetime.strptime(str(upper), '%H:%M').strftime('%H:%M')
+                except ValueError:
+                    raise serializers.ValidationError({'color_rule': 'Enter two valid times.'})
+            else:
+                try:
+                    lower = float(lower)
+                    upper = float(upper)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError({'color_rule': 'Enter two numeric range values.'})
+                if lower > upper:
+                    raise serializers.ValidationError({'color_rule': 'The lower range value must not exceed the upper value.'})
+            attrs['color_rule'] = {'operator': operator, 'min': lower, 'max': upper}
+            return attrs
         if tracker_type in {'number', 'duration', 'rating'}:
             try:
                 value = float(value)

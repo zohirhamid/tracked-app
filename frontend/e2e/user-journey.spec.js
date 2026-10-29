@@ -28,6 +28,9 @@ test("complete email account and tracking journey", async ({ page }) => {
   await page.getByRole("radio", { name: "Rating" }).check();
   await page.getByLabel("Minimum").fill("1");
   await page.getByLabel("Maximum").fill("5");
+  await page.getByLabel("Good when").selectOption("between");
+  await page.getByLabel("From", { exact: true }).fill("2");
+  await page.getByLabel("To", { exact: true }).fill("4");
   await page.getByRole("button", { name: "ADD TRACKER" }).click();
   await expect(page.getByRole("heading", { name: trackerName })).toBeVisible();
 
@@ -48,11 +51,14 @@ test("complete email account and tracking journey", async ({ page }) => {
 
   const loggedCell = page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 4/5$`) });
   await expect(loggedCell).toBeVisible();
+  await expect(loggedCell).toHaveClass(/good/);
   await loggedCell.click();
   const inlineEditor = page.locator("td.editing input.inline-editor");
   await inlineEditor.fill("5");
   await inlineEditor.press("Enter");
-  await expect(page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 5/5$`) })).toBeVisible();
+  const updatedCell = page.getByRole("cell", { name: new RegExp(`^${trackerName}, .*: 5/5$`) });
+  await expect(updatedCell).toBeVisible();
+  await expect(updatedCell).toHaveClass(/bad/);
 
   await page.getByRole("button", { name: "MONTH" }).click();
   const currentMonth = (await page.getByRole("heading", { level: 1 }).textContent()).trim();

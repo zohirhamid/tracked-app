@@ -15,10 +15,10 @@ const trackerTypeDetails = {
 };
 
 const colorRuleOptions = {
-  number: [["gte", "At least"], ["lte", "At most"]],
-  duration: [["gte", "At least"], ["lte", "At most"]],
-  rating: [["gte", "At least"], ["lte", "At most"]],
-  time: [["gte", "At or after"], ["lte", "At or before"]],
+  number: [["gte", "At least"], ["lte", "At most"], ["between", "Between"]],
+  duration: [["gte", "At least"], ["lte", "At most"], ["between", "Between"]],
+  rating: [["gte", "At least"], ["lte", "At most"], ["between", "Between"]],
+  time: [["gte", "At or after"], ["lte", "At or before"], ["between", "Between"]],
   text: [["contains", "Contains"], ["equals", "Exactly matches"]],
   prayer: [["gte", "At least"]],
 };
@@ -29,13 +29,30 @@ function ColorRuleFields({ type, rule, onChange }) {
   const operator = rule?.operator || "";
   const inputType = type === "time" ? "time" : ["number", "duration", "rating", "prayer"].includes(type) ? "number" : "text";
   const placeholder = type === "duration" ? "e.g. 8 hours" : type === "prayer" ? "1–5" : type === "text" ? "Text to match" : "Target";
-  const setOperator = (nextOperator) => onChange(nextOperator ? { operator: nextOperator, value: type === "prayer" ? 5 : type === "time" ? "22:00" : "" } : {});
+  const defaultValue = type === "prayer" ? 5 : type === "time" ? "22:00" : "";
+  const inputProps = {
+    type: inputType,
+    min: type === "duration" ? 0 : type === "prayer" ? 1 : undefined,
+    max: type === "prayer" ? 5 : undefined,
+    step: ["number", "duration"].includes(type) ? "any" : undefined,
+  };
+  const setOperator = (nextOperator) => {
+    if (!nextOperator) { onChange({}); return; }
+    if (nextOperator === "between") {
+      onChange({ operator: nextOperator, min: operator === "between" ? rule?.min ?? "" : rule?.value ?? defaultValue, max: operator === "between" ? rule?.max ?? "" : "" });
+      return;
+    }
+    onChange({ operator: nextOperator, value: operator === "between" ? rule?.min ?? defaultValue : rule?.value ?? defaultValue });
+  };
   return <fieldset className="tracker-color-rule">
     <legend>Cell colours <span className="field-hint">Optional</span></legend>
     <p>Choose what should count as good. Other logged values will be marked bad.</p>
     <div className="tracker-color-rule-fields">
       <label>Good when<select value={operator} onChange={(event) => setOperator(event.target.value)}><option value="">No custom rule</option>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      {operator && <label>{type === "duration" ? "Hours" : type === "prayer" ? "Prayers" : "Target"}<input type={inputType} min={type === "duration" ? 0 : type === "prayer" ? 1 : undefined} max={type === "prayer" ? 5 : undefined} step={["number", "duration"].includes(type) ? "any" : undefined} value={rule?.value ?? ""} placeholder={placeholder} onChange={(event) => onChange({ operator, value: event.target.value })} required /></label>}
+      {operator === "between" ? <div className="tracker-color-range">
+        <label>From<input {...inputProps} value={rule?.min ?? ""} placeholder={type === "duration" ? "Hours" : "Minimum"} onChange={(event) => onChange({ operator, min: event.target.value, max: rule?.max ?? "" })} required /></label>
+        <label>To<input {...inputProps} value={rule?.max ?? ""} placeholder={type === "duration" ? "Hours" : "Maximum"} onChange={(event) => onChange({ operator, min: rule?.min ?? "", max: event.target.value })} required /></label>
+      </div> : operator && <label>{type === "duration" ? "Hours" : type === "prayer" ? "Prayers" : "Target"}<input {...inputProps} value={rule?.value ?? ""} placeholder={placeholder} onChange={(event) => onChange({ operator, value: event.target.value })} required /></label>}
     </div>
   </fieldset>;
 }

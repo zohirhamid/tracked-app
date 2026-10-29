@@ -1906,6 +1906,17 @@ textarea:focus {
   gap: 7px;
 }
 
+.tracker-color-range {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tracker-color-range input {
+  min-width: 0;
+}
+
 .tracker-visibility-toggle {
   padding: 13px 14px;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -182,7 +182,10 @@ export function entryTone(entry, tracker) {
   if (!entry) return "";
   if (tracker.tracker_type === "binary") return entry.binary_value ? "good" : "bad";
   const rule = tracker.color_rule;
-  if (rule?.operator && rule.value !== "" && rule.value != null) {
+  const hasRuleValue = rule?.operator === "between"
+    ? rule.min !== "" && rule.min != null && rule.max !== "" && rule.max != null
+    : rule?.value !== "" && rule?.value != null;
+  if (rule?.operator && hasRuleValue) {
     let actual;
     if (tracker.tracker_type === "number") actual = Number(entry.number_value);
     if (tracker.tracker_type === "duration") actual = Number(entry.duration_minutes) / 60;
@@ -195,6 +198,12 @@ export function entryTone(entry, tracker) {
       let matches = false;
       if (rule.operator === "gte") matches = actual >= target;
       if (rule.operator === "lte") matches = actual <= target;
+      if (rule.operator === "between") {
+        const crossesMidnight = tracker.tracker_type === "time" && rule.min > rule.max;
+        matches = crossesMidnight
+          ? actual >= rule.min || actual <= rule.max
+          : actual >= rule.min && actual <= rule.max;
+      }
       if (rule.operator === "contains") matches = String(actual).toLocaleLowerCase().includes(String(target).toLocaleLowerCase());
       if (rule.operator === "equals") matches = String(actual).toLocaleLowerCase() === String(target).toLocaleLowerCase();
       return matches ? "good" : "bad";
