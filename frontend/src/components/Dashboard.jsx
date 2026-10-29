@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { buildTrackerGroups, dateParts, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, summarizeTrackers } from "../../lib.mjs";
 import { request } from "../api.js";
 import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
+import HeaderMenu from "./HeaderMenu.jsx";
 import MobileLogger from "./MobileLogger.jsx";
 
 const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -258,7 +259,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   return <>
     <div className="topbar">
       <div className="brand-group"><span className="index-tag" id="index-year">(INDEX) {visibleMonth.getFullYear()}</span><a className="brand-title" href="/">LIFELOG</a></div>
-      <div className="topbar-actions"><button className="secondary-button" type="button" onClick={() => setTrackerDialog(true)}>TRACKERS</button><button className="log-entry-button" type="button" onClick={openNewEntry}>+ LOG ENTRY</button><button className="secondary-button" type="button" onClick={onSignOut}>SIGN OUT</button></div>
+      <div className="topbar-actions"><button className="log-entry-button topbar-log-button" type="button" onClick={openNewEntry}><span aria-hidden="true">＋</span> LOG ENTRY</button><HeaderMenu onSettings={() => setTrackerDialog(true)} onSignOut={onSignOut} /></div>
     </div>
     <main id="app"><div className="dashboard-content"><section className="month-section" aria-labelledby="month-section-label">
       <div className="month-toolbar"><div className="period-heading"><h1 id="month-section-label"><time dateTime={viewMode === "week" ? activeWeek[0]?.date : monthValue}>{viewMode === "week" ? weekText : monthText}</time></h1><div className="view-switch" role="group" aria-label="Calendar view"><button type="button" className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")}>WEEK</button><button type="button" className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => setViewMode("month")}>MONTH</button></div></div></div>

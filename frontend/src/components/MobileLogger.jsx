@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry } from "../../lib.mjs";
 import { request } from "../api.js";
+import HeaderMenu from "./HeaderMenu.jsx";
 
 const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const moodFaces = [
@@ -234,7 +235,7 @@ export default function MobileLogger({ visibleMonth, setVisibleMonth, monthData,
   return <div className="mobile-logger-shell">
     <header className="mobile-logger-topbar">
       <a className="brand-title" href="/">LIFELOG</a>
-      <div><button type="button" onClick={onManageTrackers}>TRACKERS</button><button type="button" onClick={onSignOut}>SIGN OUT</button></div>
+      <HeaderMenu onSettings={onManageTrackers} onSignOut={onSignOut} />
     </header>
 
     <main className="mobile-logger-main">

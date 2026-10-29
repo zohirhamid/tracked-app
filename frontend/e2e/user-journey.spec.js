@@ -20,8 +20,13 @@ test("complete email account and tracking journey", async ({ page }) => {
   await page.getByLabel("Username").fill(username);
   await page.getByRole("button", { name: "CONTINUE" }).click();
 
-  await expect(page.getByRole("button", { name: "TRACKERS" })).toBeVisible();
-  await page.getByRole("button", { name: "TRACKERS" }).click();
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: /About/ }).click();
+  await expect(page.getByRole("heading", { name: "A clearer view of your days." })).toBeVisible();
+  await page.getByRole("button", { name: "Close about" }).click();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: /Settings/ }).click();
   await page.getByRole("button", { name: /NEW TRACKER/ }).click();
   await page.getByLabel("Name", { exact: true }).fill(trackerName);
   await page.getByLabel("Column group").fill("Wellbeing");
@@ -45,7 +50,7 @@ test("complete email account and tracking journey", async ({ page }) => {
   await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: groupedTrackerName })).toBeVisible();
 
-  await page.getByRole("button", { name: "+ LOG ENTRY" }).click();
+  await page.getByRole("button", { name: /LOG ENTRY/ }).click();
   await page.getByLabel("Value").fill("4");
   await page.getByRole("button", { name: "SAVE ENTRY" }).click();
 
@@ -71,12 +76,13 @@ test("complete email account and tracking journey", async ({ page }) => {
   await page.getByRole("tab", { name: currentMonthTab }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(currentMonth);
 
-  await page.getByRole("button", { name: "SIGN OUT" }).click();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: /Sign out/ }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "SIGN IN", exact: true }).click();
-  await expect(page.getByRole("button", { name: "SIGN OUT" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Wellbeing" })).toBeVisible();
 });
@@ -124,7 +130,8 @@ test.describe("mobile daily logger", () => {
     await expect(page.getByRole("button", { name: "LOG" })).toHaveClass(/active/);
     await expect(page.getByRole("button", { name: "\+ LOG ENTRY" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "TRACKERS" }).click();
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: /Settings/ }).click();
     await page.getByRole("button", { name: /NEW TRACKER/ }).click();
     await page.getByLabel("Name", { exact: true }).fill(mobileTracker);
     await page.getByRole("radio", { name: "Rating" }).check();
@@ -173,7 +180,11 @@ test.describe("mobile daily logger", () => {
     const narrowTimeBox = await timeInput.boundingBox();
     expect(narrowTimeBox.x).toBeGreaterThanOrEqual(narrowFieldBox.x);
     expect(narrowTimeBox.x + narrowTimeBox.width).toBeLessThanOrEqual(narrowFieldBox.x + narrowFieldBox.width);
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("menu", { name: "Account menu" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu", { name: "Account menu" })).toHaveCount(0);
     expect(runtimeErrors).toEqual([]);
   });
 });
