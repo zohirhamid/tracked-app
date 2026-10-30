@@ -128,7 +128,7 @@ function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell
   const trackers = trackerGroups.flatMap((group) => group.trackers);
   const hasNamedGroups = trackerGroups.some((group) => !group.isUngrouped);
   const width = Math.max(dateColumnWidth + trackers.reduce((sum, tracker) => sum + (columnWidths[tracker.tracker_type] || 78), 0), 520);
-  return <div className={`tracker-table-wrap${viewMode === "week" ? " week-view" : ""}`} tabIndex="0" aria-label="Tracker sheet: scroll vertically through dates and horizontally through trackers">
+  return <div className={`tracker-table-wrap${viewMode === "week" ? " week-view" : ""}`} tabIndex="0" aria-label="Tracker sheet: scroll horizontally through trackers">
     <table className={`tracker-table${loading ? " is-loading" : ""}`} style={{ width }}>
       <colgroup><col className="col-date" style={{ width: dateColumnWidth }} />{trackers.map((tracker) => <col key={tracker.id} data-type={tracker.tracker_type} style={{ width: columnWidths[tracker.tracker_type] || 78 }} />)}</colgroup>
       <thead>{hasNamedGroups ? <>

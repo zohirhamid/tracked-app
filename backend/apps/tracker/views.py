@@ -79,7 +79,7 @@ class TrackerListView(generics.ListAPIView):
 
     def get_queryset(self) -> QuerySet[Tracker]: # type: ignore[override]
         return Tracker.objects.filter(user=self.request.user).order_by(
-            '-is_active', 'display_order', 'name'
+            'display_order', 'name'
         )
         
 class TrackerCreateView(generics.CreateAPIView):

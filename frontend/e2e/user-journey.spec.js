@@ -44,13 +44,29 @@ test("complete email account and tracking journey", async ({ page }) => {
   await page.getByLabel("Column group").fill("Wellbeing");
   await page.getByRole("button", { name: "ADD TRACKER" }).click();
   await expect(page.getByRole("heading", { name: groupedTrackerName })).toBeVisible();
+
+  const energyHandle = page.getByRole("button", { name: `Reorder ${groupedTrackerName}` });
+  const moodRow = page.getByRole("option", { name: new RegExp(trackerName) });
+  const energyBox = await energyHandle.boundingBox();
+  const moodBox = await moodRow.boundingBox();
+  await page.mouse.move(energyBox.x + energyBox.width / 2, energyBox.y + energyBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(moodBox.x + moodBox.width / 2, moodBox.y + 5, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.getByText("Order saved", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 
   await expect(page.getByRole("columnheader", { name: "Wellbeing" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: groupedTrackerName })).toBeVisible();
+  const groupedColumns = await page.locator(".tracker-column-row th").allTextContents();
+  expect(groupedColumns).toEqual([groupedTrackerName, trackerName]);
+  const sheet = page.locator(".tracker-table-wrap");
+  await expect(sheet).toHaveCSS("overflow-x", "auto");
+  await expect(sheet).toHaveCSS("overflow-y", "hidden");
 
   await page.getByRole("button", { name: /LOG ENTRY/ }).click();
+  await page.locator("dialog[open] select").first().selectOption({ label: trackerName });
   await page.getByLabel("Value").fill("4");
   await page.getByRole("button", { name: "SAVE ENTRY" }).click();
 

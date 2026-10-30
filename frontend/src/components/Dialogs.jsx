@@ -180,7 +180,6 @@ function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
           group_name: values.group_name?.trim() || "",
           tracker_type: values.tracker_type,
           unit: values.tracker_type === "number" ? values.unit || null : values.tracker_type === "duration" ? "h" : null,
-          display_order: Number(values.display_order) || 0,
           is_active: values.is_active,
           min_value: values.tracker_type !== "rating" || values.min_value === "" || values.min_value == null ? null : Number(values.min_value),
           max_value: values.tracker_type !== "rating" || values.max_value === "" || values.max_value == null ? null : Number(values.max_value),
@@ -206,7 +205,6 @@ function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
     </div>
     <div className="tracker-field-grid">
       <label className="tracker-name-field">Name<input value={values.name} onChange={(event) => change("name", event.target.value)} maxLength="100" required autoFocus /></label>
-      <label>Position<input type="number" min="0" value={values.display_order} onChange={(event) => change("display_order", event.target.value)} /></label>
       <GroupNameField value={values.group_name || ""} onChange={(event) => change("group_name", event.target.value)} groupNames={groupNames} />
     </div>
     <fieldset className="tracker-type-fieldset">
@@ -267,6 +265,10 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
   const [selectedId, setSelectedId] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderMessage, setOrderMessage] = useState("");
+  const trackerOrderRef = useRef([]);
   const dialogRef = useModal(open, onClose);
 
   async function load(refreshMonth = false) {
@@ -275,6 +277,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
       const data = await request("/tracker/trackers/");
       const nextTrackers = Array.isArray(data) ? data : data.results || [];
       setTrackers(nextTrackers);
+      trackerOrderRef.current = nextTrackers;
       setSelectedId((current) => nextTrackers.some((tracker) => tracker.id === current) ? current : nextTrackers[0]?.id ?? null);
       if (refreshMonth) await onMonthRefresh();
     } catch (requestError) {
@@ -285,6 +288,93 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
   }
 
   useEffect(() => { if (open) load(); }, [open]);
+
+  function reorderTracker(trackerId, destinationIndex) {
+    const current = trackerOrderRef.current;
+    const sourceIndex = current.findIndex((tracker) => tracker.id === trackerId);
+    if (sourceIndex < 0) return null;
+    const targetIndex = Math.max(0, Math.min(destinationIndex, current.length - 1));
+    if (sourceIndex === targetIndex) return null;
+    const next = [...current];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    const ordered = next.map((tracker, index) => ({ ...tracker, display_order: index }));
+    trackerOrderRef.current = ordered;
+    setTrackers(ordered);
+    return ordered;
+  }
+
+  async function persistOrder(order) {
+    if (!order || savingOrder) return;
+    setSavingOrder(true);
+    setOrderMessage("Saving order…");
+    setError("");
+    try {
+      await Promise.all(order.map((tracker, index) => request(`/tracker/trackers/${tracker.id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ display_order: index }),
+      })));
+      setOrderMessage("Order saved");
+      await onMonthRefresh();
+      window.setTimeout(() => setOrderMessage(""), 1400);
+    } catch (requestError) {
+      setOrderMessage("");
+      setError(requestError.message);
+      await load();
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  function startPointerReorder(event, trackerId) {
+    if (savingOrder || (event.button != null && event.button !== 0)) return;
+    event.preventDefault();
+    const initialOrder = trackerOrderRef.current.map((tracker) => tracker.id).join(",");
+    setDraggingId(trackerId);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    const move = (moveEvent) => {
+      moveEvent.preventDefault();
+      const targetRow = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest("[data-tracker-sort-id]");
+      if (!targetRow) return;
+      const targetId = Number(targetRow.dataset.trackerSortId);
+      if (!targetId || targetId === trackerId) return;
+      const current = trackerOrderRef.current;
+      const sourceIndex = current.findIndex((tracker) => tracker.id === trackerId);
+      const targetIndex = current.findIndex((tracker) => tracker.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return;
+      const list = targetRow.closest(".tracker-list");
+      const horizontal = window.getComputedStyle(list).flexDirection === "row";
+      const rect = targetRow.getBoundingClientRect();
+      const after = horizontal ? moveEvent.clientX > rect.left + rect.width / 2 : moveEvent.clientY > rect.top + rect.height / 2;
+      let destination = targetIndex + (after ? 1 : 0);
+      if (sourceIndex < destination) destination -= 1;
+      reorderTracker(trackerId, destination);
+    };
+
+    const finish = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      setDraggingId(null);
+      const nextOrder = trackerOrderRef.current;
+      if (nextOrder.map((tracker) => tracker.id).join(",") !== initialOrder) persistOrder(nextOrder);
+    };
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
+  }
+
+  function keyboardReorder(event, trackerId) {
+    const offsets = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 };
+    const offset = offsets[event.key];
+    if (!offset || savingOrder) return;
+    event.preventDefault();
+    const currentIndex = trackerOrderRef.current.findIndex((tracker) => tracker.id === trackerId);
+    const next = reorderTracker(trackerId, currentIndex + offset);
+    if (next) persistOrder(next);
+  }
 
   async function create(event) {
     event.preventDefault();
@@ -331,12 +421,16 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
         <div className="tracker-manager-layout">
           <aside className="tracker-sidebar">
             <button className="add-tracker-button" type="button" onClick={() => setShowNew(true)}><span>+</span> NEW TRACKER</button>
-            <div className="tracker-list" role="listbox" aria-label="Trackers">
-              {trackers.map((tracker) => <button type="button" role="option" aria-selected={!showNew && tracker.id === selectedId} className={`tracker-list-item${!showNew && tracker.id === selectedId ? " selected" : ""}`} key={tracker.id} onClick={() => { setSelectedId(tracker.id); setShowNew(false); setError(""); }}>
-                <span className="tracker-list-glyph">{trackerTypeDetails[tracker.tracker_type]?.glyph}</span>
-                <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{tracker.group_name ? `${tracker.group_name} · ` : ""}{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
-                {!tracker.is_active && <span className="tracker-paused-dot" title="Paused">○</span>}
-              </button>)}
+            <div className="tracker-order-hint"><span>DRAG TO REORDER</span><small role="status" aria-live="polite">{orderMessage}</small></div>
+            <div className={`tracker-list${draggingId ? " is-reordering" : ""}`} role="listbox" aria-label="Trackers">
+              {trackers.map((tracker) => <div className={`tracker-list-row${draggingId === tracker.id ? " dragging" : ""}`} data-tracker-sort-id={tracker.id} key={tracker.id}>
+                <button type="button" role="option" aria-selected={!showNew && tracker.id === selectedId} className={`tracker-list-item${!showNew && tracker.id === selectedId ? " selected" : ""}`} onClick={() => { setSelectedId(tracker.id); setShowNew(false); setError(""); }}>
+                  <span className="tracker-list-glyph">{trackerTypeDetails[tracker.tracker_type]?.glyph}</span>
+                  <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{tracker.group_name ? `${tracker.group_name} · ` : ""}{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
+                  {!tracker.is_active && <span className="tracker-paused-dot" title="Paused">○</span>}
+                </button>
+                <button className="tracker-drag-handle" type="button" aria-label={`Reorder ${tracker.name}`} aria-pressed={draggingId === tracker.id} disabled={savingOrder} title="Drag to reorder. Use arrow keys for keyboard control." onPointerDown={(event) => startPointerReorder(event, tracker.id)} onKeyDown={(event) => keyboardReorder(event, tracker.id)}><span aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <i key={index} />)}</span></button>
+              </div>)}
               {loading && !trackers.length && <p className="tracker-empty-state">Loading trackers…</p>}
               {!loading && !trackers.length && <p className="tracker-empty-state">No trackers yet.<br />Add one to build your grid.</p>}
             </div>
