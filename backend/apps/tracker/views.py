@@ -1,5 +1,10 @@
 from datetime import date
 import calendar
+from allauth.account.models import EmailAddress
+from allauth.socialaccount.models import SocialAccount
+from django.contrib.auth import logout
+from django.http import JsonResponse
+from django.utils import timezone
 from .models import AccountSetup, Tracker, DailySnapshot, Entry
 from rest_framework.response import Response
 from .serializers import (
@@ -13,6 +18,108 @@ from .utils import get_month_navigation
 from rest_framework import generics, status
 from django.db.models import QuerySet
 from rest_framework.exceptions import ValidationError
+
+
+class AccountExportView(generics.GenericAPIView):
+    """Download the signed-in user's LIFELOG data without auth secrets."""
+
+    def get(self, request):
+        user = request.user
+        setup = AccountSetup.objects.filter(user=user).first()
+        trackers = list(
+            Tracker.objects.filter(user=user)
+            .order_by("display_order", "created_at")
+            .values(
+                "id",
+                "name",
+                "group_name",
+                "tracker_type",
+                "unit",
+                "display_order",
+                "is_active",
+                "min_value",
+                "max_value",
+                "color_rule",
+                "created_at",
+            )
+        )
+        snapshots = list(
+            DailySnapshot.objects.filter(user=user)
+            .order_by("date")
+            .values("id", "date")
+        )
+        entries = list(
+            Entry.objects.filter(user=user)
+            .order_by("daily_snapshot__date", "tracker_id")
+            .values(
+                "id",
+                "tracker_id",
+                "daily_snapshot_id",
+                "daily_snapshot__date",
+                "binary_value",
+                "number_value",
+                "time_value",
+                "duration_minutes",
+                "text_value",
+                "rating_value",
+                "prayer_values",
+                "created_at",
+                "updated_at",
+            )
+        )
+        email_addresses = list(
+            EmailAddress.objects.filter(user=user)
+            .order_by("email")
+            .values("email", "verified", "primary")
+        )
+        social_accounts = list(
+            SocialAccount.objects.filter(user=user)
+            .order_by("provider", "uid")
+            .values("provider", "uid", "extra_data")
+        )
+
+        payload = {
+            "format_version": 1,
+            "exported_at": timezone.now(),
+            "account": {
+                "id": user.pk,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "date_joined": user.date_joined,
+                "last_login": user.last_login,
+                "username_setup_complete": bool(setup and setup.username_is_set),
+            },
+            "authentication": {
+                "email_addresses": email_addresses,
+                "social_accounts": social_accounts,
+            },
+            "trackers": trackers,
+            "daily_snapshots": snapshots,
+            "entries": entries,
+        }
+        response = JsonResponse(payload, json_dumps_params={"indent": 2})
+        response["Cache-Control"] = "no-store"
+        response["Content-Disposition"] = (
+            f'attachment; filename="lifelog-export-{timezone.localdate().isoformat()}.json"'
+        )
+        return response
+
+
+class AccountDeleteView(generics.GenericAPIView):
+    """Permanently delete the signed-in user and all cascading account data."""
+
+    def delete(self, request):
+        if request.data.get("confirmation") != "DELETE":
+            raise ValidationError({
+                "confirmation": 'Type "DELETE" to confirm permanent account deletion.'
+            })
+
+        user = request.user
+        logout(request)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UsernameView(generics.GenericAPIView):

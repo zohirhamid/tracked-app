@@ -9,6 +9,64 @@ from rest_framework.test import APITestCase
 
 
 class AllauthFrontendIntegrationTests(APITestCase):
+    def test_signup_rejects_invalid_email_address(self):
+        response = self.client.post(
+            "/api/v1/_allauth/app/v1/auth/signup",
+            {
+                "email": "not-an-email",
+                "password": "A-valid-test-password-123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["errors"][0]["param"], "email")
+        self.assertFalse(get_user_model().objects.exists())
+
+    def test_signup_rejects_weak_passwords(self):
+        weak_passwords = (
+            "short",
+            "password",
+            "1234567890123456",
+        )
+
+        for index, password in enumerate(weak_passwords):
+            with self.subTest(password=password):
+                email = f"weak-password-{index}@example.com"
+                response = self.client.post(
+                    "/api/v1/_allauth/app/v1/auth/signup",
+                    {"email": email, "password": password},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["errors"][0]["param"], "password")
+                self.assertFalse(
+                    get_user_model().objects.filter(email=email).exists()
+                )
+
+    def test_account_deletion_invalidates_allauth_session_token(self):
+        email = "delete-through-allauth@example.com"
+        signup = self.client.post(
+            "/api/v1/_allauth/app/v1/auth/signup",
+            {"email": email, "password": "A-secure-delete-password-123!"},
+            format="json",
+        )
+        self.assertEqual(signup.status_code, 200, signup.content)
+        token = signup.json()["meta"]["session_token"]
+        self.client.credentials(HTTP_X_SESSION_TOKEN=token)
+
+        deleted = self.client.delete(
+            "/api/v1/tracker/profile/account/",
+            {"confirmation": "DELETE"},
+            format="json",
+        )
+
+        self.assertEqual(deleted.status_code, 204, deleted.content)
+        self.assertFalse(get_user_model().objects.filter(email=email).exists())
+        rejected = self.client.get("/api/v1/tracker/profile/export/")
+        self.assertIn(rejected.status_code, {401, 403, 410})
+
     @override_settings(
         SOCIALACCOUNT_PROVIDERS={
             "google": {

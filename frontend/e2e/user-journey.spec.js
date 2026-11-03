@@ -10,6 +10,11 @@ const groupedTrackerName = `Energy ${runId}`;
 test("complete email account and tracking journey", async ({ page }) => {
   await page.goto("/");
 
+  await page.getByRole("button", { name: "PRIVACY" }).click();
+  await expect(page.getByRole("heading", { name: "Your log belongs to you." })).toBeVisible();
+  await expect(page.getByText("What LIFELOG keeps")).toBeVisible();
+  await page.getByRole("button", { name: "Close privacy notice" }).click();
+
   await page.getByRole("button", { name: "Create an account" }).click();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -25,6 +30,14 @@ test("complete email account and tracking journey", async ({ page }) => {
   await page.getByRole("menuitem", { name: /About/ }).click();
   await expect(page.getByRole("heading", { name: "A clearer view of your days." })).toBeVisible();
   await page.getByRole("button", { name: "Close about" }).click();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: /Privacy & data/ }).click();
+  await expect(page.getByRole("heading", { name: "Control your data." })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "DOWNLOAD JSON" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^lifelog-export-\d{4}-\d{2}-\d{2}\.json$/);
+  await page.getByRole("button", { name: "Close privacy and data" }).click();
   await page.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("menuitem", { name: /Settings/ }).click();
   await page.getByRole("button", { name: /NEW TRACKER/ }).click();
@@ -101,6 +114,12 @@ test("complete email account and tracking journey", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: trackerName })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Wellbeing" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("menuitem", { name: /Privacy & data/ }).click();
+  await page.getByLabel(/Type DELETE to confirm/).fill("DELETE");
+  await page.getByRole("button", { name: "DELETE MY ACCOUNT" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
 test("Google sign-in reaches the configured provider", async ({ page }) => {
@@ -132,6 +151,7 @@ test.describe("mobile daily logger", () => {
     const mobileUsername = `tracked_mobile_${mobileRunId.replaceAll("-", "_")}`.slice(0, 150);
     const mobileTracker = `Mood ${mobileRunId}`;
     const mobileTimeTracker = `Wake ${mobileRunId}`;
+    const mobileCaloriesTracker = `Calories ${mobileRunId}`;
 
     await page.goto("/");
     await page.getByRole("button", { name: "Create an account" }).click();
@@ -161,6 +181,15 @@ test.describe("mobile daily logger", () => {
     await page.getByRole("radio", { name: "Time" }).check();
     await page.getByRole("button", { name: "ADD TRACKER" }).click();
     await expect(page.getByRole("heading", { name: mobileTimeTracker })).toBeVisible();
+
+    await page.getByRole("button", { name: /NEW TRACKER/ }).click();
+    await page.getByLabel("Name", { exact: true }).fill(mobileCaloriesTracker);
+    await page.getByRole("radio", { name: "Number" }).check();
+    await page.getByLabel(/Unit/).fill("kcal");
+    await page.getByRole("radio", { name: /Tap to add/ }).check();
+    await page.getByLabel("Amount per tap").fill("50");
+    await page.getByRole("button", { name: "ADD TRACKER" }).click();
+    await expect(page.getByRole("heading", { name: mobileCaloriesTracker })).toBeVisible();
     await page.getByRole("button", { name: "Close" }).click();
 
     await page.getByRole("radio", { name: "Great" }).click();
@@ -171,6 +200,12 @@ test.describe("mobile daily logger", () => {
     const timeBox = await timeInput.boundingBox();
     expect(timeBox.x).toBeGreaterThanOrEqual(fieldBox.x);
     expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(fieldBox.x + fieldBox.width);
+    const caloriesField = page.locator(".mobile-tracker-field").filter({ hasText: mobileCaloriesTracker });
+    const caloriesFieldBox = await caloriesField.boundingBox();
+    expect(Math.abs(caloriesFieldBox.width - caloriesFieldBox.height)).toBeLessThanOrEqual(1);
+    const addCalories = page.getByRole("button", { name: `Add 50 kcal to ${mobileCaloriesTracker}` });
+    for (let tap = 0; tap < 6; tap += 1) await addCalories.click();
+    await expect(page.getByLabel(`${mobileCaloriesTracker} total`)).toHaveText(/300\s*kcal/i);
     await page.getByRole("button", { name: /SAVE DAY/ }).click();
     await expect(page.getByRole("status")).toContainText("Day saved");
 

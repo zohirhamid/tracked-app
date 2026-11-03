@@ -1,6 +1,8 @@
 # tracker/urls.py
 from django.urls import path
 from .views import (
+    AccountDeleteView,
+    AccountExportView,
     MonthView,
     TrackerListView,
     TrackerCreateView,
@@ -15,6 +17,8 @@ app_name = 'tracker'
 
 urlpatterns = [
     path('profile/username/', UsernameView.as_view(), name='profile_username'),
+    path('profile/export/', AccountExportView.as_view(), name='profile_export'),
+    path('profile/account/', AccountDeleteView.as_view(), name='profile_account'),
 
     # Month view
     path('month/<int:year>/<int:month>/', MonthView.as_view(), name='month_view'),

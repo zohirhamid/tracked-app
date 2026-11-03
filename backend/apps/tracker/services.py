@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 import calendar
-from .models import Entry
+from .models import SALAT_PRAYERS, Entry
 from .serializers import EntrySerializer
 
 class MonthDataBuilder:
@@ -138,7 +138,9 @@ class MonthDataBuilder:
                 completed = 0
                 possible = 0
                 for entry in entries:
-                    for value in (entry.prayer_values or {}).values():
+                    prayer_values = entry.prayer_values or {}
+                    for prayer in SALAT_PRAYERS:
+                        value = prayer_values.get(prayer)
                         if value is not None:
                             possible += 1
                             completed += int(value is True)

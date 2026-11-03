@@ -5,7 +5,6 @@ import { EntryDialog, TrackerDialog } from "./Dialogs.jsx";
 import HeaderMenu from "./HeaderMenu.jsx";
 import MobileLogger from "./MobileLogger.jsx";
 
-const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const dateColumnWidth = 86;
 const columnWidths = { binary: 66, number: 78, time: 78, duration: 76, rating: 66, prayer: 84, text: 220 };
 
@@ -49,7 +48,7 @@ function initialValue(tracker, entry) {
 }
 
 function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
-  const [value, setValue] = useState(() => tracker.tracker_type === "prayer" ? Object.fromEntries(prayers.map((name) => [name, entry?.prayer_values?.[name] === true])) : initialValue(tracker, entry));
+  const [value, setValue] = useState(() => initialValue(tracker, entry));
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
   const finished = useRef(false);
@@ -87,11 +86,6 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
     if (event.key === "Enter") { event.preventDefault(); commit(); }
   }
 
-  if (tracker.tracker_type === "prayer") return <div className={`inline-prayer-editor${saving ? " saving" : ""}`} onKeyDown={keyDown}>
-    {prayers.map((prayer, index) => <label key={prayer} title={prayer}><input ref={index === 0 ? inputRef : undefined} type="checkbox" name={prayer} checked={value[prayer]} onChange={(event) => setValue((current) => ({ ...current, [prayer]: event.target.checked }))} />{prayer[0].toUpperCase()}</label>)}
-    <button type="button" onClick={() => commit()} aria-label="Save prayer entry">✓</button>
-  </div>;
-
   if (tracker.tracker_type === "binary") return <select ref={inputRef} className="inline-editor" value={value} onChange={(event) => { setValue(event.target.value); commit(event.target.value); }} onKeyDown={keyDown} disabled={saving}><option value="">—</option><option value="true">YES</option><option value="false">NO</option></select>;
 
   const type = tracker.tracker_type === "time" ? "time" : ["number", "duration", "rating"].includes(tracker.tracker_type) ? "number" : "text";
@@ -105,14 +99,20 @@ function InlineEditor({ tracker, entry, date, onCancel, onSave, onError }) {
   />;
 }
 
-function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, onSaved, onError }) {
+function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, onOpenDialog, onSaved, onError }) {
   const editing = activeCell === `${day.date}:${tracker.id}`;
   const value = formatEntry(entry, tracker);
   const isPastEmpty = !entry && day.date < today;
   if (editing) return <td className="editing" data-type={tracker.tracker_type}>
     <InlineEditor tracker={tracker} entry={entry} date={day.date} onCancel={() => setActiveCell(null)} onSave={(result) => { setActiveCell(null); onSaved(day.date, tracker.id, result); }} onError={onError} />
   </td>;
-  const open = () => setActiveCell(`${day.date}:${tracker.id}`);
+  const open = () => {
+    if (tracker.tracker_type === "prayer") {
+      onOpenDialog({ date: day.date, trackerId: tracker.id, entry });
+      return;
+    }
+    setActiveCell(`${day.date}:${tracker.id}`);
+  };
   const tone = isPastEmpty ? "bad" : entryTone(entry, tracker);
   return <td
     tabIndex="0" data-date={day.date} data-tracker-id={tracker.id} data-type={tracker.tracker_type}
@@ -123,7 +123,7 @@ function TrackerCell({ day, today, tracker, entry, activeCell, setActiveCell, on
   >{isPastEmpty ? "—" : value}</td>;
 }
 
-function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell, onSaved, onError }) {
+function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell, onOpenDialog, onSaved, onError }) {
   const trackerGroups = buildTrackerGroups(data?.trackers || []);
   const trackers = trackerGroups.flatMap((group) => group.trackers);
   const hasNamedGroups = trackerGroups.some((group) => !group.isUngrouped);
@@ -140,7 +140,7 @@ function TrackerTable({ data, days, viewMode, loading, activeCell, setActiveCell
         const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short" }).format(rowDate).toUpperCase();
         return <tr key={day.date} className={`${day.date === data.today ? "today-row" : ""}${day.outside_month ? " outside-month" : ""}`}>
           <th scope="row" aria-current={day.date === data.today ? "date" : undefined}>{weekday}  {String(day.day).padStart(2, "0")}</th>
-          {trackers.map((tracker) => <TrackerCell key={tracker.id} day={day} today={data.today} tracker={tracker} entry={day.entries?.[tracker.id] || day.entries?.[String(tracker.id)] || null} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={onSaved} onError={onError} />)}
+          {trackers.map((tracker) => <TrackerCell key={tracker.id} day={day} today={data.today} tracker={tracker} entry={day.entries?.[tracker.id] || day.entries?.[String(tracker.id)] || null} activeCell={activeCell} setActiveCell={setActiveCell} onOpenDialog={onOpenDialog} onSaved={onSaved} onError={onError} />)}
         </tr>;
       })}</tbody>
     </table>
@@ -160,7 +160,7 @@ function Summary({ data, days, viewMode }) {
   </section>;
 }
 
-export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, setMonthData, loading, status, loadMonth, onSignOut }) {
+export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, setMonthData, loading, status, loadMonth, onSignOut, onAccountDeleted }) {
   const [entryDialog, setEntryDialog] = useState(null);
   const [trackerDialog, setTrackerDialog] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
@@ -252,6 +252,7 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
       loadMonth={loadMonth}
       onManageTrackers={() => setTrackerDialog(true)}
       onSignOut={onSignOut}
+      onAccountDeleted={onAccountDeleted}
     />
     <TrackerDialog open={trackerDialog} onClose={() => setTrackerDialog(false)} onMonthRefresh={loadMonth} />
   </>;
@@ -259,12 +260,12 @@ export default function Dashboard({ visibleMonth, setVisibleMonth, monthData, se
   return <>
     <div className="topbar">
       <div className="brand-group"><span className="index-tag" id="index-year">(INDEX) {visibleMonth.getFullYear()}</span><a className="brand-title" href="/">LIFELOG</a></div>
-      <div className="topbar-actions"><button className="log-entry-button topbar-log-button" type="button" onClick={openNewEntry}><span aria-hidden="true">＋</span> LOG ENTRY</button><HeaderMenu onSettings={() => setTrackerDialog(true)} onSignOut={onSignOut} /></div>
+      <div className="topbar-actions"><button className="log-entry-button topbar-log-button" type="button" onClick={openNewEntry}><span aria-hidden="true">＋</span> LOG ENTRY</button><HeaderMenu onSettings={() => setTrackerDialog(true)} onSignOut={onSignOut} onAccountDeleted={onAccountDeleted} /></div>
     </div>
     <main id="app"><div className="dashboard-content"><section className="month-section" aria-labelledby="month-section-label">
       <div className="month-toolbar"><div className="period-heading"><h1 id="month-section-label"><time dateTime={viewMode === "week" ? activeWeek[0]?.date : monthValue}>{viewMode === "week" ? weekText : monthText}</time></h1><div className="view-switch" role="group" aria-label="Calendar view"><button type="button" className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => setViewMode("week")}>WEEK</button><button type="button" className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => setViewMode("month")}>MONTH</button></div></div></div>
       <p className={`app-status${displayStatus ? ` ${localStatus ? "error" : status.type}` : ""}`} role="status" aria-live="polite">{displayStatus}</p>
-      <TrackerTable data={monthData} days={visibleDays} viewMode={viewMode} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onSaved={applyInlineSave} onError={setLocalStatus} />
+      <TrackerTable data={monthData} days={visibleDays} viewMode={viewMode} loading={loading} activeCell={activeCell} setActiveCell={setActiveCell} onOpenDialog={setEntryDialog} onSaved={applyInlineSave} onError={setLocalStatus} />
       {viewMode === "month" && <nav className="month-tab-strip" aria-label={`Months in ${visibleMonth.getFullYear()}`}>
         <div className="month-tab-rail">
           <span className="month-tab-year" aria-hidden="true">{visibleMonth.getFullYear()}</span>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiUrl, ensureCsrfToken, request } from "../api.js";
+import { PrivacyNoticeDialog } from "./PrivacyNotice.jsx";
 
 function GoogleMark() {
   return <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -66,7 +67,7 @@ function GoogleAuth({ mode }) {
   </>;
 }
 
-function AuthPanel({ initialMode, initialError, onModeChange, onAuthenticated }) {
+function AuthPanel({ initialMode, initialError, onModeChange, onAuthenticated, onPrivacy }) {
   const [isSignUp, setIsSignUp] = useState(initialMode === "signup");
   const [error, setError] = useState(initialError);
   const [submitting, setSubmitting] = useState(false);
@@ -110,6 +111,7 @@ function AuthPanel({ initialMode, initialError, onModeChange, onAuthenticated })
       {isSignUp && <label>Confirm password<input name="confirmPassword" type="password" autoComplete="new-password" required disabled={submitting} /></label>}
       <p className="form-error" role="alert">{error}</p>
       <button className="log-entry-button form-submit" type="submit" disabled={submitting}>{isSignUp ? "CREATE ACCOUNT" : "SIGN IN"}</button>
+      {isSignUp && <p className="auth-privacy">By creating an account, you acknowledge the <button type="button" onClick={onPrivacy}>privacy notice</button>.</p>}
       <button className="text-button" type="button" onClick={() => { const nextMode = isSignUp ? "signin" : "signup"; setIsSignUp(!isSignUp); onModeChange(nextMode); setError(""); }}>
         {isSignUp ? "Already have an account? Sign in" : "Create an account"}
       </button>
@@ -119,6 +121,7 @@ function AuthPanel({ initialMode, initialError, onModeChange, onAuthenticated })
 
 export default function LandingPage({ initialError = "", onAuthenticated }) {
   const [authMode, setAuthMode] = useState("signin");
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const chooseAuthMode = (mode) => setAuthMode(mode);
   return <>
     <div className="topbar">
@@ -175,10 +178,11 @@ export default function LandingPage({ initialError = "", onAuthenticated }) {
         </section>
         <section className="access-section" id="access" aria-labelledby="access-title">
           <div className="access-copy"><p className="landing-kicker"><span>04</span> BEGIN WHERE YOU ARE</p><h2 id="access-title">Start with<br />one signal.</h2><p>The best tracking system is the one quiet enough to keep using.</p></div>
-          <AuthPanel initialMode={authMode} initialError={initialError} onModeChange={chooseAuthMode} onAuthenticated={onAuthenticated} />
+          <AuthPanel initialMode={authMode} initialError={initialError} onModeChange={chooseAuthMode} onAuthenticated={onAuthenticated} onPrivacy={() => setPrivacyOpen(true)} />
         </section>
-        <footer className="landing-footer"><a className="brand-title" href="/">LIFELOG</a><p>A clearer record of the days that make a life.</p><a href="#landing-title">BACK TO TOP ↑</a></footer>
+        <footer className="landing-footer"><a className="brand-title" href="/">LIFELOG</a><p>A clearer record of the days that make a life.</p><button type="button" onClick={() => setPrivacyOpen(true)}>PRIVACY</button><a href="#landing-title">BACK TO TOP ↑</a></footer>
       </main>
     </div>
+    <PrivacyNoticeDialog open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
   </>;
 }

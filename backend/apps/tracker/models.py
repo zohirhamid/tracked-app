@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 
 
+SALAT_PRAYERS = ('fajr', 'dhuhr', 'asr', 'maghrib', 'isha')
+
+
 class AccountSetup(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -28,6 +31,10 @@ class Tracker(models.Model):
         ('rating', 'Rating/Scale'),
         ('prayer', 'Islamic Prayer (5x)'),
     ]
+    ENTRY_MODE_CHOICES = [
+        ('direct', 'Enter a value'),
+        ('accumulative', 'Tap to add'),
+    ]
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -42,6 +49,18 @@ class Tracker(models.Model):
         help_text="Optional heading used to group adjacent tracker columns",
     )
     tracker_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    entry_mode = models.CharField(
+        max_length=20,
+        choices=ENTRY_MODE_CHOICES,
+        default='direct',
+        help_text='How values are entered in the daily mobile log',
+    )
+    increment_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=1,
+        help_text='Amount added by each tap for an accumulative tracker',
+    )
     unit = models.CharField(max_length=20, blank=True, null=True)
     display_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

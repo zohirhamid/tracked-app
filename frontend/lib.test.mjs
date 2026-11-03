@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  adjustAccumulatedValue,
   apiBaseUrl,
   buildTrackerGroups,
   canonicalDevelopmentUrl,
@@ -12,6 +13,7 @@ import {
   findSocialProvider,
   flattenDays,
   formatEntry,
+  SALAT_PRAYERS,
   summarizeTrackers,
   updateMonthEntry,
 } from "./lib.mjs";
@@ -146,11 +148,40 @@ test("formats every tracker value type", () => {
   );
 });
 
+test("keeps Salat values aligned to the five canonical prayers", () => {
+  assert.deepEqual(SALAT_PRAYERS, ["fajr", "dhuhr", "asr", "maghrib", "isha"]);
+  const tracker = { id: 7, tracker_type: "prayer" };
+  const entry = {
+    prayer_values: {
+      fajr: true,
+      dhuhr: true,
+      asr: false,
+      maghrib: true,
+      isha: true,
+      unexpected: true,
+    },
+  };
+
+  assert.equal(formatEntry(entry, tracker), "4/5");
+  assert.deepEqual(summarizeTrackers([tracker], [{ entries: { 7: entry } }]), [
+    { tracker_id: 7, count: 1, display: "80%" },
+  ]);
+});
+
 test("converts decimal duration hours to minute storage and back", () => {
   assert.equal(durationMinutesFromHours("9.2"), 552);
   assert.equal(durationHoursFromMinutes(552), 9.2);
   assert.equal(durationMinutesFromHours("7.5"), 450);
   assert.equal(durationHoursFromMinutes(450), 7.5);
+});
+
+test("adds and undoes configured accumulative tracker increments", () => {
+  let calories = "";
+  for (let tap = 0; tap < 6; tap += 1) calories = adjustAccumulatedValue(calories, 50);
+  assert.equal(calories, 300);
+  assert.equal(adjustAccumulatedValue(calories, 50, -1), 250);
+  assert.equal(adjustAccumulatedValue(0, 50, -1), 0);
+  assert.equal(adjustAccumulatedValue(0.2, 0.1), 0.3);
 });
 
 test("builds summaries for only the visible week", () => {

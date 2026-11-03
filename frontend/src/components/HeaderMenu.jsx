@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { AccountDataDialog } from "./PrivacyNotice.jsx";
 
-export default function HeaderMenu({ onSettings, onSignOut }) {
+export default function HeaderMenu({ onSettings, onSignOut, onAccountDeleted }) {
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [accountDataOpen, setAccountDataOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const firstItemRef = useRef(null);
@@ -55,12 +57,17 @@ export default function HeaderMenu({ onSettings, onSignOut }) {
         <button ref={firstItemRef} className="topbar-menu-item" type="button" role="menuitem" onClick={() => choose(onSettings)}>
           <span>01</span><strong>Settings</strong><small>Trackers and display</small><i aria-hidden="true">→</i>
         </button>
+        <button className="topbar-menu-item" type="button" role="menuitem" onClick={() => choose(() => setAccountDataOpen(true))}>
+          <span>02</span><strong>Privacy &amp; data</strong><small>Export or delete account</small><i aria-hidden="true">→</i>
+        </button>
         <button className="topbar-menu-item" type="button" role="menuitem" onClick={() => choose(() => setAboutOpen(true))}>
-          <span>02</span><strong>About</strong><small>About LIFELOG</small><i aria-hidden="true">→</i>
+          <span>03</span><strong>About</strong><small>About LIFELOG</small><i aria-hidden="true">→</i>
         </button>
         <button className="topbar-menu-signout" type="button" role="menuitem" onClick={() => choose(onSignOut)}>Sign out <span aria-hidden="true">↗</span></button>
       </div>}
     </div>
+
+    <AccountDataDialog open={accountDataOpen} onClose={() => setAccountDataOpen(false)} onAccountDeleted={onAccountDeleted} />
 
     <dialog className="app-dialog about-dialog" ref={aboutRef} onCancel={() => setAboutOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) setAboutOpen(false); }}>
       <article className="about-panel">

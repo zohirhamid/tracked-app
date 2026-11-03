@@ -146,6 +146,25 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_UNIQUE_EMAIL = True
 HEADLESS_ONLY = True
 
+# Allauth delegates password checks to Django's validation framework. Keep
+# these checks server-side so every email/password signup path enforces the
+# same baseline, regardless of any browser validation.
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
 FRONTEND_URL = os.getenv(
     "FRONTEND_URL",
     (

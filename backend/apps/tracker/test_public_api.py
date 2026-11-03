@@ -12,6 +12,90 @@ from .serializers import EntryWriteSerializer
 
 
 class AuthenticatedTrackerApiTests(APITestCase):
+    def test_user_can_export_only_their_account_and_tracking_data(self):
+        user = get_user_model().objects.create_user(
+            username="export-user",
+            email="export@example.com",
+            password="correct horse battery staple",
+        )
+        other_user = get_user_model().objects.create_user(
+            username="other-export-user",
+            email="other-export@example.com",
+            password="correct horse battery staple",
+        )
+        tracker = Tracker.objects.create(
+            user=user,
+            name="Private note",
+            tracker_type="text",
+        )
+        snapshot = DailySnapshot.objects.create(user=user, date="2026-10-18")
+        Entry.objects.create(
+            user=user,
+            tracker=tracker,
+            daily_snapshot=snapshot,
+            text_value="My private export value",
+        )
+        Tracker.objects.create(
+            user=other_user,
+            name="Another user's tracker",
+            tracker_type="binary",
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get("/api/v1/tracker/profile/export/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        export = response.json()
+        self.assertEqual(export["format_version"], 1)
+        self.assertEqual(export["account"]["email"], "export@example.com")
+        self.assertNotIn("password", export["account"])
+        self.assertNotIn("token", response.content.decode().lower())
+        self.assertEqual([item["name"] for item in export["trackers"]], ["Private note"])
+        self.assertEqual(export["entries"][0]["text_value"], "My private export value")
+        self.assertNotIn("Another user's tracker", response.content.decode())
+
+    def test_account_deletion_requires_confirmation_and_cascades_user_data(self):
+        user = get_user_model().objects.create_user(
+            username="delete-user",
+            email="delete@example.com",
+            password="correct horse battery staple",
+        )
+        tracker = Tracker.objects.create(
+            user=user,
+            name="Delete me",
+            tracker_type="rating",
+        )
+        snapshot = DailySnapshot.objects.create(user=user, date="2026-10-18")
+        Entry.objects.create(
+            user=user,
+            tracker=tracker,
+            daily_snapshot=snapshot,
+            rating_value=4,
+        )
+        self.client.force_authenticate(user=user)
+
+        rejected = self.client.delete(
+            "/api/v1/tracker/profile/account/",
+            {"confirmation": "delete"},
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 400)
+        self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())
+
+        deleted = self.client.delete(
+            "/api/v1/tracker/profile/account/",
+            {"confirmation": "DELETE"},
+            format="json",
+        )
+
+        self.assertEqual(deleted.status_code, 204)
+        self.assertFalse(get_user_model().objects.filter(pk=user.pk).exists())
+        self.assertFalse(Tracker.objects.filter(pk=tracker.pk).exists())
+        self.assertFalse(DailySnapshot.objects.filter(pk=snapshot.pk).exists())
+        self.assertFalse(Entry.objects.exists())
+
     def test_tracker_api_rejects_unauthenticated_requests(self):
         listing = self.client.get("/api/v1/tracker/trackers/")
         self.assertEqual(listing.status_code, 403)
@@ -80,6 +164,55 @@ class AuthenticatedTrackerApiTests(APITestCase):
         )
         self.assertEqual(prayer.status_code, 400)
 
+    def test_accumulative_trackers_store_a_positive_increment(self):
+        user = get_user_model().objects.create_user(
+            username="tap-tracker-user",
+            email="tap-tracker@example.com",
+            password="correct horse battery staple",
+        )
+        self.client.force_authenticate(user=user)
+
+        created = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {
+                "name": "Water",
+                "tracker_type": "number",
+                "entry_mode": "accumulative",
+                "increment_value": "300",
+                "unit": "ml",
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(created.json()["entry_mode"], "accumulative")
+        self.assertEqual(created.json()["increment_value"], "300.00")
+
+        invalid_type = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {
+                "name": "Done",
+                "tracker_type": "binary",
+                "entry_mode": "accumulative",
+                "increment_value": 1,
+            },
+            format="json",
+        )
+        self.assertEqual(invalid_type.status_code, 400)
+        self.assertIn("entry_mode", invalid_type.json())
+
+        invalid_increment = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {
+                "name": "Calories",
+                "tracker_type": "number",
+                "entry_mode": "accumulative",
+                "increment_value": 0,
+            },
+            format="json",
+        )
+        self.assertEqual(invalid_increment.status_code, 400)
+        self.assertIn("increment_value", invalid_increment.json())
+
     def test_entry_save_returns_updated_entry_and_monthly_summary(self):
         user = get_user_model().objects.create_user(
             username="entry-user",
@@ -116,6 +249,76 @@ class AuthenticatedTrackerApiTests(APITestCase):
         self.assertIsNone(deleted.json()["entry"])
         self.assertEqual(deleted.json()["summary"]["display"], "—")
         self.assertEqual(deleted.json()["summary"]["count"], 0)
+
+    def test_user_can_create_log_and_read_a_salat_tracker(self):
+        user = get_user_model().objects.create_user(
+            username="salat-user",
+            email="salat@example.com",
+            password="correct horse battery staple",
+        )
+        self.client.force_authenticate(user=user)
+
+        created_tracker = self.client.post(
+            "/api/v1/tracker/trackers/create/",
+            {
+                "name": "Salat",
+                "tracker_type": "prayer",
+                "color_rule": {"operator": "gte", "value": 5},
+            },
+            format="json",
+        )
+        self.assertEqual(created_tracker.status_code, 201, created_tracker.content)
+        tracker_id = created_tracker.json()["id"]
+
+        prayer_values = {
+            "fajr": True,
+            "dhuhr": True,
+            "asr": False,
+            "maghrib": True,
+            "isha": True,
+        }
+        created_entry = self.client.post(
+            "/api/v1/tracker/entries/create/",
+            {
+                "tracker_id": tracker_id,
+                "date": "2026-10-18",
+                "prayer_values": prayer_values,
+            },
+            format="json",
+        )
+
+        self.assertEqual(created_entry.status_code, 201, created_entry.content)
+        self.assertEqual(created_entry.json()["entry"]["prayer_values"], prayer_values)
+        self.assertEqual(created_entry.json()["summary"]["value"], 80.0)
+        self.assertEqual(created_entry.json()["summary"]["display"], "80%")
+
+        month = self.client.get("/api/v1/tracker/month/2026/10/")
+        self.assertEqual(month.status_code, 200, month.content)
+        self.assertEqual(month.json()["trackers"][0]["tracker_type"], "prayer")
+        day = next(
+            day
+            for week in month.json()["weeks"]
+            for day in week
+            if day["date"] == "2026-10-18"
+        )
+        self.assertEqual(day["entries"][str(tracker_id)]["prayer_values"], prayer_values)
+
+        invalid_entry = self.client.post(
+            "/api/v1/tracker/entries/create/",
+            {
+                "tracker_id": tracker_id,
+                "date": "2026-10-19",
+                "prayer_values": {**prayer_values, "witr": True},
+            },
+            format="json",
+        )
+        self.assertEqual(invalid_entry.status_code, 400)
+        self.assertFalse(
+            Entry.objects.filter(
+                tracker_id=tracker_id,
+                daily_snapshot__date="2026-10-19",
+            ).exists()
+        )
 
     def test_users_cannot_access_or_mutate_each_others_tracking_data(self):
         owner = get_user_model().objects.create_user(

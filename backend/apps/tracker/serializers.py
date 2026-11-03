@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from django.contrib.auth import get_user_model
 from datetime import datetime
-from .models import Tracker, Entry
+from .models import SALAT_PRAYERS, Tracker, Entry
 
 
 class UsernameSerializer(serializers.ModelSerializer):
@@ -27,7 +27,8 @@ class TrackerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tracker
         fields = [
-            'id', 'name', 'group_name', 'tracker_type', 'unit',
+            'id', 'name', 'group_name', 'tracker_type', 'entry_mode',
+            'increment_value', 'unit',
             'display_order', 'is_active', 'min_value', 'max_value',
             'color_rule', 'created_at'
         ]
@@ -41,6 +42,25 @@ class TrackerSerializer(serializers.ModelSerializer):
             'tracker_type',
             self.instance.tracker_type if self.instance else None,
         )
+        entry_mode = attrs.get(
+            'entry_mode',
+            self.instance.entry_mode if self.instance else 'direct',
+        )
+        increment_value = attrs.get(
+            'increment_value',
+            self.instance.increment_value if self.instance else 1,
+        )
+        if tracker_type != 'number':
+            if attrs.get('entry_mode') == 'accumulative':
+                raise serializers.ValidationError({
+                    'entry_mode': 'Tap to add is available for number trackers only.'
+                })
+            attrs['entry_mode'] = 'direct'
+            attrs['increment_value'] = 1
+        elif entry_mode == 'accumulative' and increment_value <= 0:
+            raise serializers.ValidationError({
+                'increment_value': 'Enter an amount greater than zero.'
+            })
         if 'color_rule' not in attrs:
             return attrs
         rule = attrs['color_rule']
@@ -115,7 +135,7 @@ class EntrySerializer(serializers.ModelSerializer):
 
 
 class PrayerValuesField(serializers.DictField):
-    prayer_keys = ('fajr', 'dhuhr', 'asr', 'maghrib', 'isha')
+    prayer_keys = SALAT_PRAYERS
 
     def __init__(self, **kwargs):
         super().__init__(

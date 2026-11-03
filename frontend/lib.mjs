@@ -1,3 +1,5 @@
+export const SALAT_PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+
 export function flattenDays(weeks) {
   return (weeks || []).flatMap((week) => week || []);
 }
@@ -29,6 +31,14 @@ export function durationHoursFromMinutes(minutes) {
 export function durationMinutesFromHours(hours) {
   if (hours == null || hours === "") return "";
   return Math.round(Number(hours) * 60);
+}
+
+export function adjustAccumulatedValue(currentValue, incrementValue, direction = 1) {
+  const current = Number(currentValue) || 0;
+  const increment = Number(incrementValue);
+  if (!Number.isFinite(increment) || increment <= 0) return current;
+  const next = Math.max(0, current + increment * direction);
+  return Math.round(next * 100) / 100;
 }
 
 export function formatDurationHours(minutes) {
@@ -70,7 +80,7 @@ export function summarizeTrackers(trackers, days) {
         summary.display = `${String(Math.floor(average / 60)).padStart(2, "0")}:${String(average % 60).padStart(2, "0")}`;
       }
     } else if (tracker.tracker_type === "prayer") {
-      values = entries.flatMap((entry) => Object.values(entry.prayer_values || {})).filter((value) => value != null);
+      values = entries.flatMap((entry) => SALAT_PRAYERS.map((prayer) => entry.prayer_values?.[prayer])).filter((value) => value != null);
       if (values.length) summary.display = `${Math.round(values.filter(Boolean).length / values.length * 100)}%`;
     } else if (tracker.tracker_type === "text") {
       values = entries.map((entry) => entry.text_value).filter(Boolean);
@@ -169,7 +179,7 @@ export function formatEntry(entry, tracker) {
         ? ""
         : `${entry.rating_value}${tracker.max_value ? `/${tracker.max_value}` : ""}`;
     case "prayer": {
-      const values = Object.values(entry.prayer_values || {}).filter((value) => value !== null);
+      const values = SALAT_PRAYERS.map((prayer) => entry.prayer_values?.[prayer]).filter((value) => value != null);
       if (!values.length) return "";
       return `${values.filter(Boolean).length}/${values.length}`;
     }
@@ -192,7 +202,7 @@ export function entryTone(entry, tracker) {
     if (tracker.tracker_type === "rating") actual = Number(entry.rating_value);
     if (tracker.tracker_type === "time") actual = entry.time_value?.slice(0, 5);
     if (tracker.tracker_type === "text") actual = entry.text_value;
-    if (tracker.tracker_type === "prayer") actual = Object.values(entry.prayer_values || {}).filter(Boolean).length;
+    if (tracker.tracker_type === "prayer") actual = SALAT_PRAYERS.map((prayer) => entry.prayer_values?.[prayer]).filter(Boolean).length;
     if (actual !== undefined && actual !== null && !(typeof actual === "number" && !Number.isFinite(actual))) {
       const target = rule.value;
       let matches = false;
@@ -216,7 +226,7 @@ export function entryTone(entry, tracker) {
     return progress >= 0.7 ? "good" : progress >= 0.45 ? "warn" : "bad";
   }
   if (tracker.tracker_type === "prayer") {
-    const values = Object.values(entry.prayer_values || {}).filter((value) => value !== null);
+    const values = SALAT_PRAYERS.map((prayer) => entry.prayer_values?.[prayer]).filter((value) => value != null);
     if (!values.length) return "";
     const progress = values.filter(Boolean).length / values.length;
     return progress >= 0.8 ? "good" : progress >= 0.5 ? "warn" : "bad";

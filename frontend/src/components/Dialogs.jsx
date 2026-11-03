@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { durationHoursFromMinutes, durationMinutesFromHours } from "../../lib.mjs";
+import { durationHoursFromMinutes, durationMinutesFromHours, SALAT_PRAYERS } from "../../lib.mjs";
 import { request } from "../api.js";
 
 const trackerTypes = ["binary", "number", "time", "duration", "text", "rating", "prayer"];
-const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const trackerTypeDetails = {
   binary: { label: "Yes / No", glyph: "Y/N", description: "A simple completed or not completed check." },
   number: { label: "Number", glyph: "123", description: "Any numeric value, with an optional unit." },
@@ -11,7 +10,7 @@ const trackerTypeDetails = {
   duration: { label: "Duration", glyph: "HR", description: "A length of time recorded in decimal hours, such as 7.5." },
   text: { label: "Notes", glyph: "TXT", description: "Short notes or journal-style entries." },
   rating: { label: "Rating", glyph: "★", description: "A score within a range you choose." },
-  prayer: { label: "Prayer", glyph: "5×", description: "Track the five daily prayers together." },
+  prayer: { label: "Salat", glyph: "5×", description: "Track Fajr, Dhuhr, Asr, Maghrib, and Isha together." },
 };
 
 const colorRuleOptions = {
@@ -74,7 +73,7 @@ function useModal(open, onClose) {
 function EntryValue({ tracker, entry }) {
   if (tracker.tracker_type === "binary") return <select name="value" defaultValue={entry?.binary_value == null ? "" : String(entry.binary_value)}><option value="">Not logged</option><option value="true">Yes</option><option value="false">No</option></select>;
   if (tracker.tracker_type === "text") return <textarea name="value" rows="4" defaultValue={entry?.text_value || ""} />;
-  if (tracker.tracker_type === "prayer") return <div className="prayer-inputs">{prayers.map((prayer) => <label key={prayer}><input type="checkbox" name={prayer} defaultChecked={entry?.prayer_values?.[prayer] === true} />{prayer.toUpperCase()}</label>)}</div>;
+  if (tracker.tracker_type === "prayer") return <div className="prayer-inputs">{SALAT_PRAYERS.map((prayer) => <label key={prayer} title={prayer}><input type="checkbox" name={prayer} defaultChecked={entry?.prayer_values?.[prayer] === true} aria-label={prayer} />{prayer[0].toUpperCase()}</label>)}</div>;
   const props = { name: "value", type: tracker.tracker_type === "time" ? "time" : "number" };
   if (tracker.tracker_type === "number") Object.assign(props, { step: "any", defaultValue: entry?.number_value ?? "" });
   if (tracker.tracker_type === "duration") Object.assign(props, { min: 0, step: "any", placeholder: "Hours", defaultValue: durationHoursFromMinutes(entry?.duration_minutes) });
@@ -100,7 +99,7 @@ export function EntryDialog({ state, trackers, onClose, onSaved }) {
     const form = new FormData(event.currentTarget);
     const payload = { tracker_id: tracker.id, date: state.date };
     if (tracker.tracker_type === "prayer") {
-      payload.prayer_values = Object.fromEntries(prayers.map((prayer) => [prayer, form.get(prayer) === "on"]));
+      payload.prayer_values = Object.fromEntries(SALAT_PRAYERS.map((prayer) => [prayer, form.get(prayer) === "on"]));
     } else {
       const value = form.get("value") ?? "";
       const field = { binary: "binary_value", number: "number_value", time: "time_value", duration: "duration_minutes", text: "text_value", rating: "rating_value" }[tracker.tracker_type];
@@ -142,7 +141,7 @@ export function EntryDialog({ state, trackers, onClose, onSaved }) {
       <div className="dialog-heading"><div><p className="index-tag">ENTRY</p><h2>Log entry</h2></div><button className="dialog-close" type="button" onClick={onClose} aria-label="Close">×</button></div>
       <label>Date<input name="date" type="date" defaultValue={state.date} disabled={Boolean(state.entry)} required /></label>
       <label>Tracker<select value={trackerId} onChange={(event) => setTrackerId(event.target.value)} disabled={Boolean(state.entry)} required>{trackers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label>{tracker.tracker_type === "prayer" ? "Prayers" : tracker.tracker_type === "duration" ? "Hours" : "Value"}<EntryValue key={`${tracker.id}-${state.date}`} tracker={tracker} entry={state.entry} /></label>
+      <label>{tracker.tracker_type === "prayer" ? "Salat" : tracker.tracker_type === "duration" ? "Hours" : "Value"}<EntryValue key={`${tracker.id}-${state.date}`} tracker={tracker} entry={state.entry} /></label>
       <p className="form-error" role="alert">{error}</p>
       <div className="dialog-actions">{state.entry && <button className="secondary-button" type="button" onClick={clearEntry} disabled={saving}>CLEAR</button>}<button className="log-entry-button" type="submit" disabled={saving}>SAVE ENTRY</button></div>
     </form>
@@ -155,6 +154,26 @@ function GroupNameField({ value, onChange, groupNames, name }) {
     <small>Trackers with the same group name appear together under one heading.</small>
     <datalist id="tracker-group-options">{groupNames.map((groupName) => <option value={groupName} key={groupName} />)}</datalist>
   </label>;
+}
+
+function LoggingStyleFields({ mode, increment, unit, onModeChange, onIncrementChange, names = false }) {
+  return <fieldset className="tracker-entry-mode">
+    <legend>Logging style</legend>
+    <div className="tracker-entry-mode-options">
+      <label className={mode !== "accumulative" ? "selected" : ""}>
+        <input type="radio" name={names ? "entry_mode" : undefined} value="direct" checked={mode !== "accumulative"} onChange={() => onModeChange("direct")} />
+        <strong>Enter a value</strong><small>Type the day’s total directly.</small>
+      </label>
+      <label className={mode === "accumulative" ? "selected" : ""}>
+        <input type="radio" name={names ? "entry_mode" : undefined} value="accumulative" checked={mode === "accumulative"} onChange={() => onModeChange("accumulative")} />
+        <strong>Tap to add</strong><small>Add a fixed amount with each tap on mobile.</small>
+      </label>
+    </div>
+    {mode === "accumulative" && <label className="tracker-increment-field">Amount per tap
+      <div><span>+</span><input name={names ? "increment_value" : undefined} type="number" min="0.01" step="0.01" value={increment} onChange={(event) => onIncrementChange(event.target.value)} required /><em>{unit || "units"}</em></div>
+      <small>Example: 50 kcal per tap means 6 taps logs 300 kcal.</small>
+    </label>}
+  </fieldset>;
 }
 
 function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
@@ -179,6 +198,8 @@ function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
           name: values.name,
           group_name: values.group_name?.trim() || "",
           tracker_type: values.tracker_type,
+          entry_mode: values.tracker_type === "number" ? values.entry_mode || "direct" : "direct",
+          increment_value: values.tracker_type === "number" && values.entry_mode === "accumulative" ? values.increment_value || 1 : 1,
           unit: values.tracker_type === "number" ? values.unit || null : values.tracker_type === "duration" ? "h" : null,
           is_active: values.is_active,
           min_value: values.tracker_type !== "rating" || values.min_value === "" || values.min_value == null ? null : Number(values.min_value),
@@ -210,12 +231,15 @@ function TrackerEditor({ tracker, groupNames, onSaved, onDelete, setError }) {
     <fieldset className="tracker-type-fieldset">
       <legend>Format</legend>
       <div className="tracker-type-grid">{trackerTypes.map((type) => <label className={`tracker-type-option${values.tracker_type === type ? " selected" : ""}`} key={type}>
-        <input type="radio" name="tracker_type" value={type} checked={values.tracker_type === type} onChange={() => change("tracker_type", type)} />
+        <input type="radio" name="tracker_type" value={type} checked={values.tracker_type === type} onChange={() => { change("tracker_type", type); if (type !== "number") change("entry_mode", "direct"); }} />
         <span className="tracker-type-glyph">{trackerTypeDetails[type].glyph}</span><span>{trackerTypeDetails[type].label}</span>
       </label>)}</div>
       <p className="tracker-type-help">{details.description}</p>
     </fieldset>
-    {values.tracker_type === "number" && <label>Unit <span className="field-hint">Optional</span><input value={values.unit || ""} onChange={(event) => change("unit", event.target.value)} maxLength="20" placeholder="e.g. km, pages, glasses" /></label>}
+    {values.tracker_type === "number" && <>
+      <label>Unit <span className="field-hint">Optional</span><input value={values.unit || ""} onChange={(event) => change("unit", event.target.value)} maxLength="20" placeholder="e.g. ml, kcal, km, pages" /></label>
+      <LoggingStyleFields mode={values.entry_mode || "direct"} increment={values.increment_value ?? 1} unit={values.unit} onModeChange={(value) => change("entry_mode", value)} onIncrementChange={(value) => change("increment_value", value)} />
+    </>}
     {values.tracker_type === "rating" && <div className="tracker-field-grid">
       <label>Minimum<input type="number" value={values.min_value ?? ""} onChange={(event) => change("min_value", event.target.value)} placeholder="1" /></label>
       <label>Maximum<input type="number" value={values.max_value ?? ""} onChange={(event) => change("max_value", event.target.value)} placeholder="5" /></label>
@@ -236,6 +260,9 @@ function NewTrackerForm({ groupNames, onCreate, onCancel, creating }) {
   const [type, setType] = useState("binary");
   const [colorRule, setColorRule] = useState({});
   const [groupName, setGroupName] = useState("");
+  const [entryMode, setEntryMode] = useState("direct");
+  const [increment, setIncrement] = useState("1");
+  const [unit, setUnit] = useState("");
   const details = trackerTypeDetails[type];
   return <form className="tracker-editor new-tracker-editor" onSubmit={onCreate}>
     <div className="tracker-editor-heading"><div><p className="index-tag">NEW TRACKER</p><h3>What do you want to track?</h3></div></div>
@@ -244,12 +271,15 @@ function NewTrackerForm({ groupNames, onCreate, onCancel, creating }) {
     <fieldset className="tracker-type-fieldset">
       <legend>Format</legend>
       <div className="tracker-type-grid">{trackerTypes.map((value) => <label className={`tracker-type-option${type === value ? " selected" : ""}`} key={value}>
-        <input type="radio" name="tracker_type" value={value} checked={type === value} onChange={() => { setType(value); setColorRule({}); }} />
+        <input type="radio" name="tracker_type" value={value} checked={type === value} onChange={() => { setType(value); setColorRule({}); if (value !== "number") setEntryMode("direct"); }} />
         <span className="tracker-type-glyph">{trackerTypeDetails[value].glyph}</span><span>{trackerTypeDetails[value].label}</span>
       </label>)}</div>
       <p className="tracker-type-help">{details.description}</p>
     </fieldset>
-    {type === "number" && <label>Unit <span className="field-hint">Optional</span><input name="unit" maxLength="20" placeholder="e.g. km, pages, glasses" /></label>}
+    {type === "number" && <>
+      <label>Unit <span className="field-hint">Optional</span><input name="unit" value={unit} onChange={(event) => setUnit(event.target.value)} maxLength="20" placeholder="e.g. ml, kcal, km, pages" /></label>
+      <LoggingStyleFields names mode={entryMode} increment={increment} unit={unit} onModeChange={setEntryMode} onIncrementChange={setIncrement} />
+    </>}
     {type === "rating" && <div className="tracker-field-grid"><label>Minimum<input name="min_value" type="number" placeholder="1" /></label><label>Maximum<input name="max_value" type="number" placeholder="5" /></label></div>}
     <ColorRuleFields type={type} rule={colorRule} onChange={setColorRule} />
     <input type="hidden" name="color_rule" value={JSON.stringify(colorRule)} />
@@ -385,6 +415,8 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
     try {
       const created = await request("/tracker/trackers/create/", { method: "POST", body: JSON.stringify({
         name: form.get("name"), tracker_type: form.get("tracker_type"), unit: form.get("tracker_type") === "duration" ? "h" : form.get("unit") || null,
+        entry_mode: form.get("tracker_type") === "number" ? form.get("entry_mode") || "direct" : "direct",
+        increment_value: form.get("tracker_type") === "number" && form.get("entry_mode") === "accumulative" ? form.get("increment_value") || 1 : 1,
         group_name: form.get("group_name")?.trim() || "",
         min_value: !form.get("min_value") ? null : Number(form.get("min_value")),
         max_value: !form.get("max_value") ? null : Number(form.get("max_value")),
@@ -426,7 +458,7 @@ export function TrackerDialog({ open, onClose, onMonthRefresh }) {
               {trackers.map((tracker) => <div className={`tracker-list-row${draggingId === tracker.id ? " dragging" : ""}`} data-tracker-sort-id={tracker.id} key={tracker.id}>
                 <button type="button" role="option" aria-selected={!showNew && tracker.id === selectedId} className={`tracker-list-item${!showNew && tracker.id === selectedId ? " selected" : ""}`} onClick={() => { setSelectedId(tracker.id); setShowNew(false); setError(""); }}>
                   <span className="tracker-list-glyph">{trackerTypeDetails[tracker.tracker_type]?.glyph}</span>
-                  <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{tracker.group_name ? `${tracker.group_name} · ` : ""}{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
+                  <span className="tracker-list-copy"><strong>{tracker.name}</strong><small>{tracker.group_name ? `${tracker.group_name} · ` : ""}{trackerTypeDetails[tracker.tracker_type]?.label}{tracker.entry_mode === "accumulative" ? ` · +${Number(tracker.increment_value)}` : ""}{tracker.tracker_type === "duration" ? " · h" : tracker.unit ? ` · ${tracker.unit}` : ""}</small></span>
                   {!tracker.is_active && <span className="tracker-paused-dot" title="Paused">○</span>}
                 </button>
                 <button className="tracker-drag-handle" type="button" aria-label={`Reorder ${tracker.name}`} aria-pressed={draggingId === tracker.id} disabled={savingOrder} title="Drag to reorder. Use arrow keys for keyboard control." onPointerDown={(event) => startPointerReorder(event, tracker.id)} onKeyDown={(event) => keyboardReorder(event, tracker.id)}><span aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <i key={index} />)}</span></button>

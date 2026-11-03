@@ -137,6 +137,8 @@ https://tracked.zohirhamid.com/accounts/google/login/callback/
 GET    /api/v1/auth/csrf/
 GET    /api/v1/tracker/profile/username/
 POST   /api/v1/tracker/profile/username/
+GET    /api/v1/tracker/profile/export/
+DELETE /api/v1/tracker/profile/account/
 GET    /api/v1/tracker/month/<year>/<month>/
 GET    /api/v1/tracker/trackers/
 POST   /api/v1/tracker/trackers/create/

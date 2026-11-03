@@ -4,8 +4,8 @@ from .models import Tracker, DailySnapshot, Entry
 
 @admin.register(Tracker)
 class TrackerAdmin(admin.ModelAdmin):
-    list_display = ('name', 'group_name', 'user', 'tracker_type', 'is_active')
-    list_filter = ('group_name', 'tracker_type', 'is_active')
+    list_display = ('name', 'group_name', 'user', 'tracker_type', 'entry_mode', 'is_active')
+    list_filter = ('group_name', 'tracker_type', 'entry_mode', 'is_active')
     search_fields = ('name', 'user__username', 'user__email')
 
 

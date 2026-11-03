@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry } from "../../lib.mjs";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { adjustAccumulatedValue, durationHoursFromMinutes, durationMinutesFromHours, entryTone, flattenDays, formatEntry, formatNumber, SALAT_PRAYERS } from "../../lib.mjs";
 import { request } from "../api.js";
 import HeaderMenu from "./HeaderMenu.jsx";
 
-const prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 const moodFaces = [
   { face: "😣", label: "Rough" },
   { face: "😕", label: "Low" },
@@ -31,7 +30,7 @@ function initialValue(tracker, entry) {
   if (tracker.tracker_type === "duration") return durationHoursFromMinutes(entry?.duration_minutes);
   if (tracker.tracker_type === "rating") return entry?.rating_value ?? "";
   if (tracker.tracker_type === "time") return entry?.time_value?.slice(0, 5) || "";
-  if (tracker.tracker_type === "prayer") return Object.fromEntries(prayers.map((name) => [name, entry?.prayer_values?.[name] === true]));
+  if (tracker.tracker_type === "prayer") return Object.fromEntries(SALAT_PRAYERS.map((name) => [name, entry?.prayer_values?.[name] === true]));
   return entry?.text_value || "";
 }
 
@@ -60,6 +59,37 @@ function ratingChoices(tracker) {
   }));
 }
 
+function MobileSalatControl({ tracker, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef(null);
+  const completed = SALAT_PRAYERS.filter((prayer) => value?.[prayer]).length;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+
+  return <>
+    <button className="mobile-salat-summary-button" type="button" onClick={() => setOpen(true)} aria-label={`Edit ${tracker.name}: ${completed} of 5 completed`}>
+      <strong>{completed}/5</strong><small>Tap to edit</small>
+    </button>
+    <dialog className="app-dialog mobile-salat-dialog" ref={dialogRef} onCancel={() => setOpen(false)} onClose={() => setOpen(false)} aria-labelledby={`mobile-salat-title-${tracker.id}`}>
+      <div className="mobile-salat-panel">
+        <div className="dialog-heading"><div><p className="index-tag">SALAT</p><h2 id={`mobile-salat-title-${tracker.id}`}>{tracker.name}</h2></div><button className="dialog-close" type="button" onClick={() => setOpen(false)} aria-label="Close">×</button></div>
+        <div className="prayer-inputs mobile-salat-options" role="group" aria-label={tracker.name}>
+          {SALAT_PRAYERS.map((prayer) => <label key={prayer} title={prayer}>
+            <input type="checkbox" checked={Boolean(value?.[prayer])} onChange={(event) => onChange({ ...value, [prayer]: event.target.checked })} aria-label={prayer} />
+            {prayer[0].toUpperCase()}
+          </label>)}
+        </div>
+        <button className="log-entry-button" type="button" onClick={() => setOpen(false)}>DONE</button>
+      </div>
+    </dialog>
+  </>;
+}
+
 function TrackerControl({ tracker, value, onChange }) {
   if (tracker.tracker_type === "binary") return <div className="mobile-choice-grid two" role="group" aria-label={tracker.name}>
     <button type="button" className={value === "false" ? "selected" : ""} aria-pressed={value === "false"} onClick={() => onChange("false")}><span>×</span>No</button>
@@ -77,17 +107,25 @@ function TrackerControl({ tracker, value, onChange }) {
     ><span aria-hidden="true">{choice.face}</span><small>{choice.label}</small></button>)}
   </div>;
 
-  if (tracker.tracker_type === "prayer") return <div className="prayer-picker" role="group" aria-label={tracker.name}>
-    {prayers.map((prayer) => <button
-      type="button"
-      key={prayer}
-      className={value?.[prayer] ? "selected" : ""}
-      aria-pressed={Boolean(value?.[prayer])}
-      onClick={() => onChange({ ...value, [prayer]: !value?.[prayer] })}
-    ><span>{value?.[prayer] ? "✓" : "○"}</span>{prayer}</button>)}
-  </div>;
+  if (tracker.tracker_type === "prayer") return <MobileSalatControl tracker={tracker} value={value} onChange={onChange} />;
 
   if (tracker.tracker_type === "text") return <textarea className="mobile-textarea" rows="4" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Add a note about your day…" />;
+
+  if (tracker.tracker_type === "number" && tracker.entry_mode === "accumulative") {
+    const increment = Number(tracker.increment_value) || 1;
+    const total = Number(value) || 0;
+    const unit = tracker.unit || "units";
+    return <div className="mobile-accumulative-control">
+      <output aria-live="polite" aria-label={`${tracker.name} total`}><strong>{formatNumber(total)}</strong><span>{unit}</span></output>
+      <button className="mobile-add-button" type="button" onClick={() => onChange(adjustAccumulatedValue(value, increment))} aria-label={`Add ${formatNumber(increment)} ${unit} to ${tracker.name}`}>
+        <span>+</span><strong>{formatNumber(increment)}</strong><small>{unit} per tap</small>
+      </button>
+      <div className="mobile-accumulative-actions">
+        <button type="button" onClick={() => onChange(adjustAccumulatedValue(value, increment, -1))} disabled={total <= 0}>− Undo</button>
+        <button type="button" onClick={() => onChange("")} disabled={value === ""}>Clear</button>
+      </div>
+    </div>;
+  }
 
   const type = tracker.tracker_type === "time" ? "time" : "number";
   return <div className={`mobile-input-wrap mobile-input-${tracker.tracker_type}`}>
@@ -148,7 +186,7 @@ function MonthOverview({ weeks, trackers, today, onChooseDay }) {
   </section>;
 }
 
-export default function MobileLogger({ visibleMonth, setVisibleMonth, monthData, loading, status, loadMonth, onManageTrackers, onSignOut }) {
+export default function MobileLogger({ visibleMonth, setVisibleMonth, monthData, loading, status, loadMonth, onManageTrackers, onSignOut, onAccountDeleted }) {
   const [view, setView] = useState("day");
   const [date, setDate] = useState(() => localDateKey(new Date()));
   const [draft, setDraft] = useState({});
@@ -235,7 +273,7 @@ export default function MobileLogger({ visibleMonth, setVisibleMonth, monthData,
   return <div className="mobile-logger-shell">
     <header className="mobile-logger-topbar">
       <a className="brand-title" href="/">LIFELOG</a>
-      <HeaderMenu onSettings={onManageTrackers} onSignOut={onSignOut} />
+      <HeaderMenu onSettings={onManageTrackers} onSignOut={onSignOut} onAccountDeleted={onAccountDeleted} />
     </header>
 
     <main className="mobile-logger-main">
@@ -261,10 +299,12 @@ export default function MobileLogger({ visibleMonth, setVisibleMonth, monthData,
 
       {trackers.length > 0 && view === "day" && <form className="mobile-day-form" onSubmit={save}>
         <div className="mobile-form-intro"><span>{trackers.length} prompts</span><p>Tap, type, and save when your day feels complete.</p></div>
-        {trackers.map((tracker, index) => <fieldset className="mobile-tracker-field" key={tracker.id}>
-          <legend><span>{String(index + 1).padStart(2, "0")}</span><strong>{tracker.name}</strong>{tracker.unit && tracker.tracker_type !== "number" ? <small>{tracker.unit}</small> : null}</legend>
-          <TrackerControl tracker={tracker} value={draft[tracker.id] ?? (tracker.tracker_type === "prayer" ? {} : "")} onChange={(value) => update(tracker.id, value)} />
-        </fieldset>)}
+        <div className="mobile-entry-grid">
+          {trackers.map((tracker, index) => <fieldset className={`mobile-tracker-field mobile-tracker-${tracker.tracker_type}${tracker.entry_mode === "accumulative" ? " accumulative" : ""}`} key={tracker.id}>
+            <legend><span>{String(index + 1).padStart(2, "0")}</span><strong>{tracker.name}</strong>{tracker.unit && tracker.tracker_type !== "number" ? <small>{tracker.unit}</small> : null}</legend>
+            <TrackerControl tracker={tracker} value={draft[tracker.id] ?? (tracker.tracker_type === "prayer" ? {} : "")} onChange={(value) => update(tracker.id, value)} />
+          </fieldset>)}
+        </div>
 
         <div className="mobile-save-dock">
           <p className={message && message !== "Day saved" ? "error" : ""} role="status">{message || status.message}</p>
